@@ -1,0 +1,23 @@
+#EXTM3U
+#PLAYLIST:Claude Code in Production - 65 Automation Patterns
+
+#EXTINF:-1,第1章｜讓 Claude 寫程式不失憶的三層配置
+http://187.127.109.145/audio/kindle-20/kindle20-ch1-design-foundations.m4a
+
+#EXTINF:-1,第2章｜掌控 Claude Code 的 17 個 Hooks
+http://187.127.109.145/audio/kindle-20/kindle20-ch2-hooks.m4a
+
+#EXTINF:-1,第3章｜打造聽話不燒錢的子代理
+http://187.127.109.145/audio/kindle-20/kindle20-ch3-sub-agents.m4a
+
+#EXTINF:-1,第4章｜打造無人值守 AI 開發管線
+http://187.127.109.145/audio/kindle-20/kindle20-ch4-ci-cd.m4a
+
+#EXTINF:-1,第5章｜AI 代理的三層資安防禦
+http://187.127.109.145/audio/kindle-20/kindle20-ch5-permissions-security.m4a
+
+#EXTINF:-1,第6章｜把 AI 寫程式帳單打一折
+http://187.127.109.145/audio/kindle-20/kindle20-ch6-cost-optimization.m4a
+
+#EXTINF:-1,第7章｜AI 寫程式防翻車指南
+http://187.127.109.145/audio/kindle-20/kindle20-ch7-production-workflows.m4a

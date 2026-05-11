@@ -1,0 +1,36 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "Review the following session data:\n$ARGUMENTS\n\nCheck all of the following:\n1. If stop_hook_active is true, you must return ok: true\n2. If last_assistant_message contains an error or indicates incomplete work, return ok: false\n3. Otherwise, return ok: true\n\nAlways respond in JSON format: {\"ok\": true/false, \"reason\": \"reason\"}"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "Review the following user prompt:\n$ARGUMENTS\n\nCheck whether the .prompt field contains any sensitive information (API keys, passwords, personal information). If it does, return ok: false; otherwise return ok: true.\n\n{\"ok\": true/false, \"reason\": \"reason\"}"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "prompt",
+            "model": "claude-haiku-4-5-20251001",
+            "prompt": "Review the result of the file edit:\n$ARGUMENTS\n\nOnly if tool_input.file_path is a .ts or .js file, check for obvious security issues (SQL injection, XSS, hardcoded credentials).\nIf issues are found, return ok: false with a specific reason. If no issues or the file type is not applicable, return ok: true.\n{\"ok\": true/false, \"reason\": \"reason\"}"
+          }
+        ]
+      }
+    ]
+  }
+}

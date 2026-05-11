@@ -1,0 +1,16 @@
+# 大型二進位檔（太大無法推 GitHub）
+audio/
+PDF/
+PNG/
+
+# PPTX 子目錄 PNG（已在 kindle-20-pptx repo）
+PPTX/ch*/
+PPTX/png/
+
+# PPTX 章節 PDF（大檔）
+PPTX/*.pdf
+
+# 系統檔
+.DS_Store
+Thumbs.db
+*.stackdump

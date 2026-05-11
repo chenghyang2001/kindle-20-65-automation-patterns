@@ -1,0 +1,34 @@
+# P37: Safe CI analysis with --permission-mode plan
+# Reference: Claude Code in Production, Part 4
+
+name: Security Analysis
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+      - name: Security Analysis
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          REPORT=$(claude --permission-mode plan -p \
+            "Analyze the src/ directory and report the following issues:
+             SQL injection, missing authentication checks,
+             hardcoded secrets.
+             For each issue, include the file name, line number, and severity.
+             Output only the report — do not ask questions." \
+            --output-format json | jq -r '.result')
+          echo "$REPORT" > security-report.txt
+          cat security-report.txt
+      - name: Upload Security Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-report
+          path: security-report.txt

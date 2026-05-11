@@ -1,0 +1,21 @@
+digraph seven_stage {
+  rankdir=LR;
+  node [shape=box, style=rounded];
+
+  brainstorm [label="S1: Brainstorm\nRequirements"];
+  worktree   [label="S2: Worktree\nIsolated Environment"];
+  plan       [label="S3: Plan\nDesign & Verify"];
+  subagent   [label="S4: Subagent\nParallel Implementation"];
+  tdd        [label="S5: TDD\nTest-Driven"];
+  review     [label="S6: Review\nQuality Verification"];
+  complete   [label="S7: Complete\nCommit"];
+  reject     [label="Redesign"];
+
+  brainstorm -> worktree -> plan;
+  plan -> subagent [label="OK"];
+  plan -> reject   [label="No"];
+  reject -> plan;
+  subagent -> tdd -> review;
+  review -> complete [label="Pass"];
+  review -> tdd      [label="Fail"];
+}

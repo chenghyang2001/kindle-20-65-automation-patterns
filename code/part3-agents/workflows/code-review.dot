@@ -1,0 +1,22 @@
+digraph code_review_workflow {
+  rankdir=LR;
+  node [shape=box];
+
+  start [label="Start", shape=oval];
+  explore [label="Code Exploration\n(Explore agent)"];
+  spec_check [label="Spec Compliance Check\n(spec-compliance-reviewer)"];
+  quality_check [label="Quality Check\n(code-quality-reviewer)"];
+  security_check [label="Security Check\n(security-reviewer)"];
+  fix [label="Fix Issues"];
+  done [label="Done", shape=oval];
+
+  start -> explore;
+  explore -> spec_check;
+  spec_check -> fix [label="FAIL"];
+  spec_check -> quality_check [label="PASS"];
+  quality_check -> security_check [label="PASS"];
+  quality_check -> fix [label="Critical found"];
+  security_check -> done [label="PASS"];
+  security_check -> fix [label="Critical found"];
+  fix -> spec_check;
+}

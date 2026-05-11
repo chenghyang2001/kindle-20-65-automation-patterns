@@ -1,0 +1,9 @@
+{
+  "name": "my-team-plugin",
+  "version": "1.0.0",
+  "description": "Shared Skills, Hooks, and Agents for the team",
+  "author": {
+    "name": "Dev Team"
+  },
+  "license": "MIT"
+}
