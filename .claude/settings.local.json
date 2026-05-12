@@ -18,7 +18,12 @@
       "Bash(printf '<div>placeholder</div>\\\\n')",
       "Bash(grep -c \"<!-- TODO -->\" src/demo.html)",
       "Bash(bash code/part2-hooks/quality/quality-gate.sh)",
-      "Bash(bash code/part2-hooks/lifecycle/audit-config.sh)"
+      "Bash(bash code/part2-hooks/lifecycle/audit-config.sh)",
+      "Bash(cp \"C:/Users/B00332/workspace/kindle-20-65-automation-patterns/code/part2-hooks/lifecycle/save-session-state.sh\" \"C:/Users/B00332/.claude/hooks/save-session-state.sh\")",
+      "Bash(cp \"C:/Users/B00332/workspace/kindle-20-65-automation-patterns/code/part2-hooks/lifecycle/restore-context.sh\" \"C:/Users/B00332/.claude/hooks/restore-context.sh\")",
+      "Bash(cp \"C:/Users/B00332/workspace/kindle-20-65-automation-patterns/code/part2-hooks/security/mcp-write-guard.sh\" \"C:/Users/B00332/.claude/hooks/mcp-write-guard.sh\")",
+      "Bash(bash ~/.claude/hooks/restore-context.sh)",
+      "Bash(bash ~/.claude/hooks/mcp-write-guard.sh)"
     ]
   }
 }
