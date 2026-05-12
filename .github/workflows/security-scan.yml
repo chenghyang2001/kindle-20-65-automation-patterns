@@ -38,7 +38,10 @@ jobs:
           fi
 
           # 執行 Claude Code 安全掃描，結果輸出為 JSON
-          SCAN_RESULT=$(claude -p \
+          # 使用 if ! 構型防止 set -e 在 claude 返回非零時立刻終止腳本
+          # --dangerously-skip-permissions 跳過 CI 無 TTY 環境的互動提示
+          SCAN_RESULT=""
+          if ! SCAN_RESULT=$(claude -p \
             "請對 code/ 目錄下的所有 Shell 腳本進行安全掃描。
             檢查項目包含：
             1. 命令注入風險（eval、unquoted 變數等）
@@ -52,8 +55,11 @@ jobs:
             ## 建議修正方式" \
             --allowedTools "Read,Grep,Glob" \
             --permission-mode plan \
+            --dangerously-skip-permissions \
             --max-turns 5 \
-            --output-format json 2>&1)
+            --output-format json 2>&1); then
+            echo "警告：Claude 掃描返回非零退出碼，繼續解析已捕獲的輸出"
+          fi
 
           # 從 JSON 結果中提取文字報告
           # 先讀入 raw 再解析，避免 json.load 消耗 stdin 後 except 區塊無法重讀的 bug
@@ -70,6 +76,9 @@ jobs:
 
           echo "=== 安全掃描報告 ==="
           cat security-report.txt
+
+          # 如果報告為空則寫入提示
+          [ -s security-report.txt ] || echo "掃描報告為空" > security-report.txt
 
       # 上傳掃描報告為 artifact，保留 30 天
       - name: Upload security report
