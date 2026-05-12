@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(echo '{\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"C:\\\\\\\\Users\\\\\\\\B00332\\\\\\\\workspace\\\\\\\\kindle-20-65-automation-patterns\\\\\\\\hello-hook-test.json\"}}')",
+      "Bash(\"C:\\\\Program Files\\\\Git\\\\usr\\\\bin\\\\bash.exe\" -l code/part2-hooks/quality/auto-format.sh)",
+      "Bash(printf '{\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"C:\\\\\\\\\\\\\\\\Users\\\\\\\\\\\\\\\\B00332\\\\\\\\\\\\\\\\workspace\\\\\\\\\\\\\\\\kindle-20-65-automation-patterns\\\\\\\\\\\\\\\\hello-hook-test.json\"}}')",
+      "Bash(\"C:/Program Files/Git/usr/bin/bash.exe\" -l code/part2-hooks/quality/auto-format.sh)",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(\"C:/Program Files/Git/usr/bin/bash.exe\" -l -c 'pwd && ls code/part2-hooks/quality/auto-format.sh 2>&1')",
+      "Bash(cygpath *)",
+      "Bash(bash code/part2-hooks/security/block-dangerous.sh)",
+      "Bash(echo \"exit code: $?\")",
+      "Bash(bash code/part2-hooks/security/mcp-write-guard.sh)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(bash code/part2-hooks/lifecycle/save-session-state.sh)",
+      "Bash(bash code/part2-hooks/lifecycle/restore-context.sh)",
+      "Bash(printf '<div>placeholder</div>\\\\n')",
+      "Bash(grep -c \"<!-- TODO -->\" src/demo.html)"
+    ]
+  }
+}

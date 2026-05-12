@@ -1,0 +1,11 @@
+{
+  "greeting": "hello world",
+  "numbers": [1, 2, 3, 4, 5],
+  "nested": { "a": true, "b": false, "c": null },
+  "message": "debug hook demo",
+  "extra": {
+    "key1": 1,
+    "key2": 2,
+    "key3": { "deep": true, "arr": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] }
+  }
+}

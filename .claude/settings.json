@@ -1,0 +1,72 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash code/part2-hooks/lifecycle/restore-context.sh"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash code/part2-hooks/security/block-dangerous.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__filesystem__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash code/part2-hooks/security/mcp-write-guard.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash code/part2-hooks/quality/quality-gate.sh"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash code/part2-hooks/lifecycle/save-session-state.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"C:\\Program Files\\Git\\usr\\bin\\bash.exe\" -l -c 'INPUT=$(cat); FILE_PATH=$(echo \"$INPUT\" | jq -r \".tool_input.file_path // empty\"); [ -z \"$FILE_PATH\" ] && exit 0; EXT=\"${FILE_PATH##*.}\"; case \"$EXT\" in js|jsx|ts|tsx|css|json) npx prettier --write \"$FILE_PATH\" 2>/dev/null ;; go) gofmt -w \"$FILE_PATH\" 2>/dev/null ;; py) black \"$FILE_PATH\" 2>/dev/null ;; md) npx markdownlint-cli2 --fix \"$FILE_PATH\" 2>/dev/null ;; esac'"
+          }
+        ]
+      },
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash code/part2-hooks/settings-examples/debug-hook.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
