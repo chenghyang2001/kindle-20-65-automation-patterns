@@ -10,24 +10,30 @@ jobs:
   review:
     runs-on: ubuntu-latest
     permissions:
-      # contents: read 讀取儲存庫內容（checkout + gh pr diff）
-      contents: read
+      # contents: write 讀取儲存庫、合併 PR（auto-merge）、推送修復 commits（auto-fix）
+      contents: write
       # pull-requests: write 發表審查留言
       pull-requests: write
 
     steps:
       - uses: actions/checkout@v4
         with:
-          # 取得完整 git 歷史，使 gh pr diff 能正確產出差異
+          # fetch-depth: 0 確保 gh pr diff 與 git log 能正確存取完整歷史
           fetch-depth: 0
+          # token 允許 auto-fix-pr.sh 推送修復 commits 回 PR 分支
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       # 安裝 Claude Code CLI（用 npm global 安裝）
       - name: Install Claude Code
         run: npm install -g @anthropic-ai/claude-code
 
       # 執行 AI 審查腳本，傳入 PR 編號
+      # review.sh 同時處理：發表審查留言、APPROVE 時 auto-merge、REQUEST_CHANGES 時 auto-fix
       - name: Run AI Review
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: bash .github/scripts/review.sh "${{ github.event.pull_request.number }}"
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          bash .github/scripts/review.sh "${{ github.event.pull_request.number }}"

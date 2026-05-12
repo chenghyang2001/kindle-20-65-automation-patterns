@@ -26,9 +26,10 @@ fi
 echo "開始審查 PR #${PR_NUMBER}..."
 
 # --- 取得 PR diff ---
+REVIEW_FILE=""
 DIFF_FILE=$(mktemp /tmp/pr-diff-XXXXXX.diff)
-# 確保臨時檔案在腳本結束時清理
-trap 'rm -f "$DIFF_FILE"' EXIT
+# EXIT trap 同時清理 DIFF_FILE 和 REVIEW_FILE，防止 set -e 提前退出時臨時檔案殘留
+trap 'rm -f "$DIFF_FILE" "${REVIEW_FILE:-}"' EXIT
 
 if ! gh pr diff "$PR_NUMBER" > "$DIFF_FILE" 2>&1; then
   echo "錯誤：無法取得 PR #${PR_NUMBER} 的 diff" >&2
@@ -116,3 +117,54 @@ _由 Claude Code 自動生成，僅供參考。_"
 
 gh pr comment "$PR_NUMBER" --body "$COMMENT_BODY"
 echo "PR #${PR_NUMBER} 審查留言發表成功"
+
+# --- 解析 verdict 並自動處理 PR ---
+
+# 從審查內容中提取 verdict（匹配 "Verdict：APPROVE" 或 "Verdict: APPROVE"）
+if echo "$REVIEW" | tail -10 | grep -qE "Verdict[：:]\s*APPROVE"; then
+  VERDICT="APPROVE"
+else
+  VERDICT="REQUEST_CHANGES"
+fi
+
+echo "審查 Verdict：${VERDICT}"
+
+# 計算本 PR 已有幾次自動修復 commit（防止無限迴圈）
+AUTO_FIX_COUNT=$(gh pr view "$PR_NUMBER" --json commits \
+  --jq '[.commits[].messageHeadline | select(startswith("Auto-fix:"))] | length' \
+  2>/dev/null || echo "0")
+
+echo "已自動修復次數：${AUTO_FIX_COUNT}"
+
+if [ "$VERDICT" = "APPROVE" ]; then
+  # Phase 1：自動合併（squash merge）
+  echo "AI 審查 APPROVE，啟用自動合併..."
+  # --auto 旗標：等所有 required checks 通過後再 merge（安全機制）
+  gh pr merge "$PR_NUMBER" \
+    --squash \
+    --auto \
+    --subject "Auto-merged: AI Review APPROVED (#${PR_NUMBER})" \
+    --body "AI code review approved and all CI checks passed. Auto-merged by GitHub Actions."
+  echo "PR #${PR_NUMBER} 已設定自動合併（等待 CI checks 完成）"
+
+elif [ "$AUTO_FIX_COUNT" -lt 2 ]; then
+  # Phase 2：自動修復後重新審查
+  echo "AI 審查 REQUEST_CHANGES，嘗試自動修復（第 $((AUTO_FIX_COUNT + 1)) 次）..."
+
+  # 把審查內容存入臨時檔案，傳給 auto-fix-pr.sh
+  REVIEW_FILE=$(mktemp /tmp/review-content-XXXXXX.md)
+  echo "$REVIEW" > "$REVIEW_FILE"
+
+  # 呼叫自動修復腳本（與 review.sh 同目錄）
+  SCRIPT_DIR="$(dirname "$(realpath "$0")")"
+  bash "${SCRIPT_DIR}/auto-fix-pr.sh" "$PR_NUMBER" "$REVIEW_FILE"
+  # REVIEW_FILE 由頂部 EXIT trap 統一清理，不在此手動 rm
+
+else
+  # 超過自動修復上限，標記需人工介入
+  echo "已嘗試 ${AUTO_FIX_COUNT} 次自動修復，超過上限（2 次），標記需人工審查"
+  # 嘗試加 label（若 label 不存在會失敗，用 || true 容錯）
+  gh pr edit "$PR_NUMBER" --add-label "needs-human-review" 2>/dev/null || true
+  gh pr comment "$PR_NUMBER" \
+    --body "⚠️ 已嘗試 **${AUTO_FIX_COUNT}** 次自動修復，仍有未通過的審查問題，請人工介入處理。"
+fi
