@@ -33,3 +33,4 @@ while IFS= read -r -d '' _; do
 done < <(find "$SRC_DIR" \( -name "*.log" -o -name "*.conf" \) -print0)
 
 echo "已備份完成（含 $COUNT 個 .log/.conf 檔案）到 $BACKUP_DIR"
+exit 0
