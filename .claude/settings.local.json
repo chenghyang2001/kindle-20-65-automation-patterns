@@ -17,7 +17,8 @@
       "Bash(bash code/part2-hooks/lifecycle/restore-context.sh)",
       "Bash(printf '<div>placeholder</div>\\\\n')",
       "Bash(grep -c \"<!-- TODO -->\" src/demo.html)",
-      "Bash(bash code/part2-hooks/quality/quality-gate.sh)"
+      "Bash(bash code/part2-hooks/quality/quality-gate.sh)",
+      "Bash(bash code/part2-hooks/lifecycle/audit-config.sh)"
     ]
   }
 }

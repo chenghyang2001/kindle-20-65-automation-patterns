@@ -28,6 +28,15 @@
             "command": "bash code/part2-hooks/security/mcp-write-guard.sh"
           }
         ]
+      },
+      {
+        "matcher": "Write(.claude/settings.json)|Edit(.claude/settings.json)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'INPUT=$(cat); echo \"$INPUT\" | jq -r \"{source: \\\"project_settings\\\", file_path: (.tool_input.file_path // empty)}\" | bash code/part2-hooks/lifecycle/audit-config.sh'"
+          }
+        ]
       }
     ],
     "Stop": [
