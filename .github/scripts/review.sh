@@ -71,7 +71,7 @@ diff 檔案路徑為：${DIFF_FILE}
 ## 結論
 **Verdict：APPROVE** 或 **Verdict：REQUEST_CHANGES**
 
-請輸出 JSON，包含 'result' 欄位，值為上方的 markdown 審查內容。" \
+請直接輸出以上格式的 markdown，不需要額外包裝成 JSON 格式。" \
   --allowedTools "Read,Grep,Glob" \
   --permission-mode plan \
   --max-turns 3 \
