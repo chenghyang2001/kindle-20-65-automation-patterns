@@ -140,6 +140,13 @@ ${FIX_SUMMARY}"
 # --- 推送到 PR 分支 ---
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 echo "推送修復到分支：${CURRENT_BRANCH}"
+
+# 使用 PAT 設定 remote URL，確保推送能觸發新的 workflow
+# GITHUB_TOKEN 推送不觸發 workflow（GitHub 平台限制），PAT 推送才會觸發
+if [ -n "${GH_PAT:-}" ] && [ -n "${GITHUB_REPOSITORY:-}" ]; then
+  git remote set-url origin "https://x-access-token:${GH_PAT}@github.com/${GITHUB_REPOSITORY}.git"
+fi
+
 git push
 
 echo "PR #${PR_NUMBER} 自動修復完成並已推送（第 ${FIX_INDEX} 次）"

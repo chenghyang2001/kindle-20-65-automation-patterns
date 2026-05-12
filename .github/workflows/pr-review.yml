@@ -21,7 +21,7 @@ jobs:
           # fetch-depth: 0 確保 gh pr diff 與 git log 能正確存取完整歷史
           fetch-depth: 0
           # token 允許 auto-fix-pr.sh 推送修復 commits 回 PR 分支
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GH_PAT }}
 
       # 安裝 Claude Code CLI（用 npm global 安裝）
       - name: Install Claude Code
@@ -32,7 +32,8 @@ jobs:
       - name: Run AI Review
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          GH_PAT: ${{ secrets.GH_PAT }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
