@@ -23,7 +23,11 @@
       "Bash(cp \"C:/Users/B00332/workspace/kindle-20-65-automation-patterns/code/part2-hooks/lifecycle/restore-context.sh\" \"C:/Users/B00332/.claude/hooks/restore-context.sh\")",
       "Bash(cp \"C:/Users/B00332/workspace/kindle-20-65-automation-patterns/code/part2-hooks/security/mcp-write-guard.sh\" \"C:/Users/B00332/.claude/hooks/mcp-write-guard.sh\")",
       "Bash(bash ~/.claude/hooks/restore-context.sh)",
-      "Bash(bash ~/.claude/hooks/mcp-write-guard.sh)"
+      "Bash(bash ~/.claude/hooks/mcp-write-guard.sh)",
+      "Bash(black --version)",
+      "Bash(gofmt --help)",
+      "Bash(gofmt -h)",
+      "Bash(pip show *)"
     ]
   }
 }
