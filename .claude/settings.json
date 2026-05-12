@@ -68,6 +68,16 @@
         ]
       },
       {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "prompt",
+            "model": "claude-haiku-4-5-20251001",
+            "prompt": "Review the result of the file edit:\n$ARGUMENTS\n\nOnly if tool_input.file_path is a .ts or .js file, check for obvious security issues (SQL injection, XSS, hardcoded credentials).\nIf issues are found, return ok: false with a specific reason. If no issues or the file type is not applicable, return ok: true.\n{\"ok\": true/false, \"reason\": \"reason\"}"
+          }
+        ]
+      },
+      {
         "matcher": ".*",
         "hooks": [
           {
