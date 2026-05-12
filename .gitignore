@@ -14,3 +14,5 @@ PPTX/*.pdf
 .DS_Store
 Thumbs.db
 *.stackdump
+.claude/session-state.md
+.claude/config-audit.log
