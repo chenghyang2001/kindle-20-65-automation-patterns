@@ -17,3 +17,4 @@ Thumbs.db
 .claude/session-state.md
 .claude/config-audit.log
 .claude/settings.local.json
+.claude/worktrees/
