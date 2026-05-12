@@ -1,0 +1,81 @@
+# 安全掃描工作流
+# 在 push 到 main 或 PR 時觸發，對 code/ 目錄進行靜態安全分析
+# 使用 --permission-mode plan 確保 Claude 只讀取不修改任何檔案
+name: Security Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      # 上傳 artifact 不需要額外權限，contents: read 已足夠
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # 安裝 Claude Code CLI
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      # 執行安全掃描：分析 code/ 目錄的腳本是否有安全疑慮
+      # --allowedTools 限制為純讀取工具，--permission-mode plan 防止修改任何檔案
+      - name: Run Security Scan
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set -euo pipefail
+
+          # 驗證必要環境變數已設定
+          if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+            echo "錯誤：ANTHROPIC_API_KEY 未設定，無法執行安全掃描"
+            exit 1
+          fi
+
+          # 執行 Claude Code 安全掃描，結果輸出為 JSON
+          SCAN_RESULT=$(claude -p \
+            "請對 code/ 目錄下的所有 Shell 腳本進行安全掃描。
+            檢查項目包含：
+            1. 命令注入風險（eval、unquoted 變數等）
+            2. 硬編碼密碼或 API Key
+            3. 不安全的 curl / wget 使用（未驗證憑證）
+            4. 權限過寬的 chmod（例如 777）
+            5. 可預測的臨時檔案路徑（競態條件 /tmp）
+            輸出格式：
+            ## 掃描摘要
+            ## 發現的問題（含嚴重度：HIGH/MEDIUM/LOW）
+            ## 建議修正方式" \
+            --allowedTools "Read,Grep,Glob" \
+            --permission-mode plan \
+            --max-turns 5 \
+            --output-format json 2>&1)
+
+          # 從 JSON 結果中提取文字報告
+          # 先讀入 raw 再解析，避免 json.load 消耗 stdin 後 except 區塊無法重讀的 bug
+          echo "$SCAN_RESULT" | python3 -c "
+          import json, sys
+          raw = sys.stdin.read()
+          try:
+              data = json.loads(raw)
+              print(data.get('result', '掃描結果為空'))
+          except (json.JSONDecodeError, Exception):
+              print('掃描輸出（非 JSON）：')
+              print(raw)
+          " > security-report.txt 2>&1 || echo "$SCAN_RESULT" > security-report.txt
+
+          echo "=== 安全掃描報告 ==="
+          cat security-report.txt
+
+      # 上傳掃描報告為 artifact，保留 30 天
+      - name: Upload security report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-scan-report
+          path: security-report.txt
+          retention-days: 30

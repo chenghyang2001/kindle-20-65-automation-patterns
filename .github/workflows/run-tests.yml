@@ -1,0 +1,64 @@
+# 主要 CI 工作流：Shell 語法檢查 + YAML 驗證
+# 此工作流名稱 "Run Tests" 被 auto-fix.yml 的 workflow_run 觸發器引用，不可更改
+name: Run Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 檢查 code/ 目錄下所有 .sh 檔案的語法是否合法
+      - name: Shell syntax check
+        run: |
+          set -euo pipefail
+          SH_FILES=$(find code/ -name "*.sh" 2>/dev/null)
+          if [ -z "$SH_FILES" ]; then
+            echo "No .sh files found in code/ — skipping syntax check"
+          else
+            echo "$SH_FILES" | xargs -I {} bash -n {} && echo "All .sh files syntax OK"
+          fi
+
+      # 驗證非 workflow 目錄下的所有 YAML 檔案格式是否合法
+      # 使用 stdin 重新導向傳遞檔案內容，避免將 $f 展開至 Python 字串造成路徑注入
+      - name: YAML validation
+        run: |
+          set -euo pipefail
+          FAILED=0
+          while IFS= read -r f; do
+            if python3 -c "import yaml, sys; yaml.safe_load(sys.stdin)" < "$f" 2>&1; then
+              echo "OK: $f"
+            else
+              echo "FAIL: $f"
+              FAILED=1
+            fi
+          done < <(find . -name "*.yml" -not -path "./.github/workflows/*" 2>/dev/null)
+          if [ "$FAILED" -ne 0 ]; then
+            echo "YAML 驗證失敗，請修正上方標記的檔案"
+            exit 1
+          fi
+          echo "All YAML files validated successfully"
+
+      # 將測試輸出儲存為 artifact，供 auto-fix.yml 使用（失敗時讀取）
+      - name: Save test output
+        if: failure()
+        run: |
+          echo "Test run failed at $(date -u)" > test-output.txt
+          find code/ -name "*.sh" | xargs -I {} bash -n {} 2>&1 >> test-output.txt || true
+          find . -name "*.yml" -not -path "./.github/workflows/*" | while IFS= read -r f; do
+            python3 -c "import yaml, sys; yaml.safe_load(sys.stdin)" < "$f" 2>&1 >> test-output.txt || true
+          done
+
+      - name: Upload test output artifact
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-output
+          path: test-output.txt
+          retention-days: 1

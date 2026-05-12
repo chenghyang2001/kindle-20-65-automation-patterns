@@ -1,0 +1,33 @@
+# PR 自動 AI 審查工作流
+# 在 PR 開啟或推送新 commit 時觸發，呼叫 review.sh 執行 Claude Code 審查
+name: AI Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      # contents: read 讀取儲存庫內容（checkout + gh pr diff）
+      contents: read
+      # pull-requests: write 發表審查留言
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # 取得完整 git 歷史，使 gh pr diff 能正確產出差異
+          fetch-depth: 0
+
+      # 安裝 Claude Code CLI（用 npm global 安裝）
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      # 執行 AI 審查腳本，傳入 PR 編號
+      - name: Run AI Review
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash .github/scripts/review.sh "${{ github.event.pull_request.number }}"
