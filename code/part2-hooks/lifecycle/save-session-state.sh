@@ -8,7 +8,9 @@ if ! command -v jq &>/dev/null; then
   exit 1
 fi
 
-TRIGGER=$(echo "${INPUT:-{}}" | jq -r '.trigger // "n/a"')
+# 避免 ${INPUT:-{}} 的 bash 參數展開歧義（會多吐一個 } 污染 jq）
+[ -z "$INPUT" ] && INPUT='{}'
+TRIGGER=$(echo "$INPUT" | jq -r '.trigger // "n/a"')
 TIMESTAMP=$(date '+%Y-%m-%d %H:%M')
 STATE_FILE="${PWD}/.claude/session-state.md"
 mkdir -p "$(dirname "$STATE_FILE")"
