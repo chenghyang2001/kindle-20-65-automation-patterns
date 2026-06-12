@@ -1,0 +1,13 @@
+# 行尾正規化規則（跨平台保證）
+# 對應 ch2 Pattern 21-22：跨平台 hook 必須統一 LF，否則 Linux/macOS 跑 .sh
+# 會因 CRLF 的 \r 混入 shebang 與變數而報 bad interpreter。
+
+# Shell 腳本在所有平台（含 Windows）checkout 一律 LF，不受各機器 core.autocrlf 影響
+*.sh text eol=lf
+
+# 明確標記二進位檔，避免 git 嘗試行尾轉換而損毀內容
+*.m4a binary
+*.wav binary
+*.png binary
+*.pptx binary
+*.pdf binary
