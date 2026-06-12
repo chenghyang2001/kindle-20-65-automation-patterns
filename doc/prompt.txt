@@ -1,0 +1,26 @@
+=== Session 2（2026-06-12）關鍵 prompts ===
+
+# 接續轉錄 + hook demo
+繼續：檢查 ch2 轉錄是否完成，完成就讀全文字稿並執行 part2-hooks 的 hook demo
+
+# 修 bug（三 agent）
+派 agent 修這個 bug
+
+# 跨平台 LF
+裝 shellcheck 補跑 V5 lint
+派一輪三 agent 把 6 支轉 LF
+
+# 教學文件 + NotebookLM 流水線（重複套用於 ch1-ch7）
+write a complete tutorial document to a total unknown student. acts as you are a teacher
+and will teach a senior high student. then create a new nlm file and add your material as
+input and generate studio file: audio summary, video summary and slide deck.
+
+# 各章 demo 模板
+based on this partN transcript file @... and its sample code file at the folder @... do
+the sample code demo so that i can know what the sample code aim for
+
+# 教學對象決定
+要 教學對象 職場新鮮人版
+
+# 收尾
+現在順手做 session 收尾
