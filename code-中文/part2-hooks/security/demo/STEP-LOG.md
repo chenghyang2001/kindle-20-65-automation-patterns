@@ -69,22 +69,48 @@ echo '{"tool_input": {"command": "rm old-report.txt"}}' | bash demo/block-danger
 
 ## Step 4：滲透測試 — 親手繞過防線
 
-**命令：** 餵 9 個變形危險指令（多空格 / 參數對調 / 完整參數名 / 大寫 / find / fork bomb / 變數隱藏）。
+**命令：** 9 種繞過技巧（大小寫 / 空格 / 旗標拆分 / 旗標順序 / 小寫 SQL / 完整路徑 / base64 混淆 / 子目錄 / 變數隱藏）。
+
+```bash
+echo '{"tool_input":{"command":"RM -RF /"}}' | bash security/demo/block-dangerous-demo.sh; echo $?
+echo '{"tool_input":{"command":"rm  -rf /"}}' | bash security/demo/block-dangerous-demo.sh; echo $?
+echo '{"tool_input":{"command":"rm -r -f /"}}' | bash security/demo/block-dangerous-demo.sh; echo $?
+echo '{"tool_input":{"command":"rm -fr /"}}' | bash security/demo/block-dangerous-demo.sh; echo $?
+echo '{"tool_input":{"command":"drop table users"}}' | bash security/demo/block-dangerous-demo.sh; echo $?
+echo '{"tool_input":{"command":"/bin/rm -rf /"}}' | bash security/demo/block-dangerous-demo.sh; echo $?
+echo '{"tool_input":{"command":"echo cmQgLXJmIC8= | base64 -d | bash"}}' | bash security/demo/block-dangerous-demo.sh; echo $?
+echo '{"tool_input":{"command":"rm -rf /var/www"}}' | bash security/demo/block-dangerous-demo.sh; echo $?
+echo '{"tool_input":{"command":"CMD=\"rm -rf /\"; $CMD"}}' | bash security/demo/block-dangerous-demo.sh; echo $?
+```
+
 **目的：** 實證字串比對的天花板。
 **預期：** 多數穿透。
-**實際驗證：** ⚠️ **9 個變形 7 個穿透（78%）**：
+**實際驗證：** ⚠️ **6 穿透 / 3 被擋（66% 繞過率）**：
 
-| 變形 | 結果 | 原因 |
-|------|------|------|
-| `rm  -rf  /`（多空格）| 穿透 | 字串不匹配 |
-| `rm -fr /`（參數對調）| 穿透 | `-fr` ≠ `-rf` |
-| `rm --recursive --force /` | 穿透 | 完整參數名 ≠ 縮寫 |
-| `RM -RF /`（大寫）| 穿透 | grep 預設區分大小寫 |
-| `find / -delete`（換工具）| 穿透 | 沒用 rm |
-| `:(){ :\|:& };:`（fork bomb）| 穿透 | 黑名單沒這條 |
-| `TARGET=/; rm -rf $TARGET` | 穿透 | `/` 藏在變數，掃描時未展開 |
+| # | 技巧 | 結果 | 原因 |
+|---|------|------|------|
+| 1 | `RM -RF /` 大寫 | exit 0 ❌ 穿透 | `grep` 預設大小寫敏感，pattern 全小寫 |
+| 2 | `rm  -rf /` 雙空格 | exit 0 ❌ 穿透 | `-F` 字面比對，兩格≠一格 |
+| 3 | `rm -r -f /` 拆旗標 | exit 0 ❌ 穿透 | `-r -f` ≠ `-rf`，子字串不存在 |
+| 4 | `rm -fr /` 順序互換 | exit 0 ❌ 穿透 | `-fr` ≠ `-rf` |
+| 5 | `drop table users` 小寫 | exit 0 ❌ 穿透 | pattern 是 `DROP TABLE` 全大寫 |
+| 6 | `/bin/rm -rf /` 完整路徑 | exit 2 ✅ 被擋 | `/bin/` 後仍含子字串 `rm -rf /` |
+| 7 | base64 混淆 | exit 0 ❌ 穿透 | 危險指令藏在編碼裡，外層字串無 pattern |
+| 8 | `rm -rf /var/www` 子目錄 | exit 2 ✅ 被擋（⚠️ 友軍誤傷） | 字串以 `rm -rf /` 為前綴，後面有 `var/www` 也照擋 |
+| 9 | `CMD="rm -rf /"; $CMD` 變數 | exit 2 ✅ 被擋 | 引號內字串被整行掃描，字面 pattern 照樣命中 |
 
-**結論：** block-dangerous 是「第一道」防線非「唯一」防線。對付變形要靠第 10 課懂語意的 AI 裁判。深度防禦 = 字串黑名單擋 80% 笨攻擊（快、免費）+ AI 裁判擋 20% 聰明攻擊（慢、花錢但懂語意）。
+**結論：** 字面比對黑名單的根本弱點：
+
+```
+破不了的：大小寫 / 空格數量 / 旗標順序 / 小寫 SQL / base64 混淆（6/9 繞過）
+意外守住：路徑前綴、引號內字串、子目錄（刪 /var/www 也被擋 = 友軍誤傷）
+```
+
+block-dangerous 是「第一道」防線，不是「唯一」防線。更強防禦的梯次：
+
+1. **字串黑名單**（本課）：快、免費，擋 60-70% 笨攻擊
+2. **AI 語意裁判**（第 10 課）：懂語意，擋聰明繞過，但每次都花 API 費
+3. **Permission Model 白名單**（Part 5）：連 `rm` 本身都不給執行，從根阻斷
 
 ---
 ---
