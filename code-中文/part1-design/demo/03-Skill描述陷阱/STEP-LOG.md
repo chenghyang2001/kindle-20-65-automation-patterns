@@ -52,7 +52,16 @@
 
 ### 實際結果
 
-（演練時填入）
+| 比較維度 | bad-example | good-example（SKILL.md） |
+|---------|------------|------------------------|
+| 長度（行數） | 6 行（含 5 步驟） | 2 行 |
+| 內容類型 | 執行步驟（怎麼做） | 定義 + 觸發情境（是什麼 + 什麼時候用）|
+| 有沒有觸發情境 | 沒有 | 有（生產環境發布、緊急部署）|
+| 有沒有同義詞 | 沒有 | 有（生產環境發布 / 緊急部署）|
+
+- Q1：bad-example 寫了「執行步驟」（npm test / build / push / 驗證 / Slack），把 Skill 主體的內容放進了 description
+- Q2：AI 讀完後產生錯覺「我已經知道完整步驟了」→ 跳過 Skill 主體直接照 description 執行
+- Q3：good-example 只說兩件事：①做什麼（部署到生產環境）②什麼時候用（顯式呼叫 + 適用情境）
 
 ---
 
@@ -101,7 +110,9 @@ AI 匹配 Skill 的機制：
 
 ### 實際結果
 
-（演練時填入）
+- 與「PR 審查」語意相近：✅幫我看 Code 能不能 Merge / ✅審查 Pull Request / ✅Code Review / ✅合併前幫我檢查 / ✅這個 PR 有什麼問題 / ✅Review 程式碼品質；❌部署到正式環境
+- 只寫「執行程式碼審查」可能漏掉：「能不能 Merge」「合併前檢查」「PR 有什麼問題」（這些說法向量距離較遠）
+- 同義詞原因：增加「語意表面積」，讓向量匹配有更多錨點，使用者任何說法都能命中正確 Skill
 
 ---
 
@@ -139,7 +150,16 @@ description: >
 
 ### 實際結果
 
-（演練時填入）
+改寫版（good）：
+
+```yaml
+description: >
+  發布新版本到生產環境。
+  適用於：deploy、上線、發布正式版、推到 main、緊急熱修上線。
+  必須透過 /deploy 顯式呼叫，不自動觸發。
+```
+
+關鍵改動：移除 5 個執行步驟、加觸發情境、加同義詞、加「不自動觸發」防誤觸
 
 ---
 
@@ -175,7 +195,32 @@ description: >
 
 ### 實際結果
 
-（演練時填入）
+**Skill A：自動生成 Release Notes**
+
+```yaml
+description: >
+  從 git log 自動生成 Changelog 和 Release Notes。
+  適用於：版本發布前整理變更、生成 CHANGELOG、寫 release 說明、
+  幫我整理這次版本改了什麼、v1.2.0 有哪些更新。
+```
+
+**Skill B：資料庫 Schema 分析**
+
+```yaml
+description: >
+  分析資料庫結構，找出效能瓶頸和缺少的 index。
+  適用於：DB 跑很慢、查詢優化、schema review、
+  幫我看 index 夠不夠、資料庫設計有什麼問題、缺哪些索引。
+```
+
+**Skill C：API 文件生成**
+
+```yaml
+description: >
+  從程式碼的 JSDoc 自動產生 OpenAPI / Swagger 文件。
+  適用於：生成 API 文件、更新 swagger、JSDoc 轉文件、
+  幫我把程式碼的註解變成 API spec、輸出 openapi.yaml。
+```
 
 ---
 
