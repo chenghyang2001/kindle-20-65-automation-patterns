@@ -47,7 +47,10 @@
 
 ### 實際結果
 
-（演練時填入）
+- 引入語法：`@docs/git-workflow.md`（`@` 前綴 + 相對路徑）
+- Commit 格式改了只需改 `docs/git-workflow.md` 一個檔案，CLAUDE.md 不用動
+- 三個 docs/ 檔案合計約 60–100 行，加上 CLAUDE.md 本體整個暴增 70–120 行且每次都全部讀入
+- 模組化好處：①維護性—單一來源，改一處全生效；②Token 效率—CLAUDE.md 保持短小；③可讀性—像目錄，一眼看出規範分類
 
 ---
 
@@ -85,7 +88,15 @@
 
 ### 實際結果
 
-（演練時填入）
+| 層級 | 放了什麼規則 | 適用於誰 |
+|------|-----------|---------|
+| 根目錄 | Commit 格式、分支命名、PR 規範、建置指令、禁止在 packages/ 直建檔 | 整個 repo 所有人 |
+| frontend/ | React + Vite 技術棧、函式型元件、React Query / Zustand、port 5173 | 前端工程師 |
+| backend/ | Express + PostgreSQL、只透過 repositories/ 存 DB、API 型別驗證、port 3000 | 後端工程師 |
+| shared/ | 共用型別不放業務邏輯、必須 JSDoc、不發 npm | 維護共用套件的人 |
+
+- Q1：「不可在 packages/ 直建檔」是跨所有子套件的架構鐵律，放根目錄才能管全局；放子目錄只管自己那層
+- Q2：不會。AI 在 frontend/ 工作只讀 frontend/CLAUDE.md + 根目錄，backend/CLAUDE.md 完全不在視野裡
 
 ---
 
@@ -147,7 +158,19 @@ my-app/
 
 ### 實際結果
 
-（演練時填入）
+- Q1：修後端 Go 程式碼用 **tab（gofmt）**。backend/CLAUDE.md 先讀，覆蓋根目錄的「2 空格」規則
+- Q2：修前端 React 程式碼用 **2 空格**。frontend/CLAUDE.md 無縮排規定，向上找根目錄規則
+- Q3：類似程式語言的**變數 Scope（作用域）**，內層 scope 遮蔽（shadow）外層同名規則
+
+**設計練習結果：**
+
+| 規則 | 應放在哪個 CLAUDE.md |
+|------|-------------------|
+| 「密碼絕對不能硬編碼在程式碼裡」 | 根目錄（全公司鐵律） |
+| React Native 的元件使用 StyleSheet.create | mobile/CLAUDE.md |
+| FastAPI 的 endpoint 必須加 Pydantic 驗證 | api/CLAUDE.md |
+| Git commit 格式遵循 Conventional Commits | 根目錄（全公司規範） |
+| Next.js 優先使用 Server Components | web/CLAUDE.md |
 
 ---
 
@@ -172,7 +195,16 @@ my-app/
 
 ### 實際結果
 
-（演練時填入）
+| 分類 | 內容 |
+|------|------|
+| 設定 / 啟動 | npm install + dev server port 3000 |
+| 程式碼慣例 | TypeScript strict、Server Components 優先、co-locate |
+| 測試 | Jest + Testing Library（單元）、Playwright（E2E） |
+| 資料抓取 | Server Components 先、React Query 補快取、絕不在 Client 重複抓 |
+| 環境變數 | NEXT_PUBLIC_ = 客戶端可見；不加 = 伺服器端機密 |
+
+- Q2：NEXT_PUBLIC_ 變數會被打包進前端 JS，任何人 DevTools 都看得到；不加前綴的只在 Node.js runtime 存在。防止 AI 把 DB 密碼寫成 NEXT_PUBLIC_DB_PASS 洩漏給用戶
+- Q3：可套用於任何 Next.js App Router + TypeScript 專案；需改：port 號、專案名稱、測試工具（若不用 Playwright）
 
 ---
 
