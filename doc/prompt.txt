@@ -24,3 +24,13 @@ the sample code demo so that i can know what the sample code aim for
 
 # 收尾
 現在順手做 session 收尾
+
+# Part 3 Sub-agents 互動課程（7 堂）
+c:\Users\user\workspace\kindle-20-65-automation-patterns\code-中文\part3-agents\ 让这个是第三张的sample code
+跑第 1 課 互動式：你跟我講要做什麼，我來做
+跑第 2 課
+跑第 3 課
+跑第 4 課
+跑第 5 課
+跑第 6 課
+跑第 7 課
