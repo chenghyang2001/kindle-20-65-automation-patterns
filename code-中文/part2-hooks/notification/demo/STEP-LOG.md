@@ -81,21 +81,27 @@ echo '{}' | bash demo/notify-demo.sh
 **下的命令：**
 
 ```bash
-# 用 PowerShell EncodedCommand（base64 + UTF-16LE）傳中文，避開 cp950 坑
-ENCODED=$(python -c "...base64.b64encode(ps.encode('utf-16-le'))...")
+# 先嘗試 MessageBox（需要 WPF 組件）→ TypeNotFound 失敗
+# 改用 WScript.Shell Popup（COM 物件，不需額外載入組件）
+ENCODED=$(python -c "
+import base64
+ps = r'(New-Object -ComObject WScript.Shell).Popup(\"Claude Code 正在等待輸入\", 0, \"Claude Code 通知\", 0)'
+print(base64.b64encode(ps.encode('utf-16-le')).decode())
+")
 powershell -EncodedCommand "$ENCODED"
+echo "exit: $?"
 ```
 
 **目的：** 原版 macOS 通知看不到，用 PowerShell 彈真的 Windows 通知視窗示範移植。
 
-**預期效果：** 螢幕彈出「Claude Code 通知」對話框，按 OK 回傳 `OK`。
+**預期效果：** 螢幕彈出「Claude Code 通知」對話框，按 OK 回傳數字 `1`。
 
-**實際驗證結果：** ✅ 視窗彈出、按 OK 回傳 `OK`。另 **活捉 CLIXML 輸出污染**：
+**實際驗證結果：** ✅ 視窗彈出、按 OK 終端機顯示 `1`（WScript.Shell Popup 回傳值：1=OK / 2=取消 / -1=逾時）
 
-- 輸出開頭混入 `#< CLIXML <Objs Version=...>` 序列化噪音
-- 這就是 Windows 版的「輸出污染」（對應 macOS 的 .bashrc 歡迎訊息污染，Pattern 22）
-- 若這段 PowerShell 包在 hook 裡，這串噪音會讓 Claude 解析 stdout JSON 崩潰
-- 解法同 .bashrc 污染：手動 pipe 測試、肉眼確認輸出純淨
+- `WScript.Shell` 是 COM 物件，輸出乾淨，**沒有 CLIXML 污染**
+- 踩坑記錄：`[System.Windows.MessageBox]::Show()` 未先 `Add-Type -AssemblyName PresentationFramework` → `TypeNotFound` 錯誤
+- CLIXML 污染風險：改用 `.NET` 方法（`[System.Windows.Forms.MessageBox]`）且沒重導向時，輸出會混入 `#< CLIXML <Objs Version=...>` 序列化噪音，Claude 解析 hook stdout 時崩潰
+- 解法：測試時手動 `echo '假JSON' | bash hook.sh` 肉眼確認 stdout 純淨，選 COM 物件優先於 .NET 方法
 
 ---
 
