@@ -1,0 +1,13 @@
+{
+  "test_case": "安全的一般 prompt",
+  "input": "請幫我用 Python 寫一個讀取 CSV 檔案並計算平均值的腳本",
+  "ai_verdict": {"ok": true, "reason": "prompt 內容為一般程式設計請求（讀取 CSV 並計算平均值），不含 API 金鑰、密碼或個人資料。"},
+  "action": "放行（Claude Code 繼續處理）"
+}
+---
+{
+  "test_case": "含 API key 的敏感 prompt",
+  "input": "我的 API key 是 sk-ant-api03-abcd1234efgh5678，請用它呼叫...",
+  "ai_verdict": {"ok": false, "reason": "prompt 欄位包含 Anthropic API 金鑰（sk-ant-api03-...），屬於敏感憑證，不應出現在請求內容中"},
+  "action": "阻擋（Claude Code 顯示 reason 給使用者，不執行 prompt）"
+}

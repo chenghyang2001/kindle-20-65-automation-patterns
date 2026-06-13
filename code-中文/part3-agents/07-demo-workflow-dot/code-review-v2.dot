@@ -1,0 +1,25 @@
+digraph code_review_workflow {
+  rankdir=LR;
+  node [shape=box];
+
+  start [label="開始", shape=oval];
+  explore [label="程式碼探索\n(Explore agent)"];
+  spec_check [label="規格遵循檢查\n(spec-compliance-reviewer)"];
+  quality_check [label="品質檢查\n(code-quality-reviewer)"];
+  security_check [label="安全性檢查\n(security-reviewer)"];
+  api_check [label="API 設計審查\n(api-reviewer)"];
+  fix [label="修正問題"];
+  done [label="完成", shape=oval];
+
+  start -> explore;
+  explore -> spec_check;
+  spec_check -> fix [label="FAIL"];
+  spec_check -> quality_check [label="PASS"];
+  quality_check -> security_check [label="PASS"];
+  quality_check -> fix [label="發現 Critical"];
+  security_check -> api_check [label="PASS"];
+  security_check -> fix [label="發現 Critical"];
+  api_check -> done [label="PASS"];
+  api_check -> fix [label="發現 Critical"];
+  fix -> spec_check;
+}

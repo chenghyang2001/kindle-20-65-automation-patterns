@@ -39,24 +39,6 @@
         ]
       }
     ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash code/part2-hooks/quality/quality-gate.sh"
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash code/part2-hooks/lifecycle/save-session-state.sh"
-          }
-        ]
-      }
-    ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write",

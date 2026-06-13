@@ -1,0 +1,55 @@
+==============================
+第 10 課：Prompt Hook 結構解析
+==============================
+
+Prompt Hook 和一般命令 Hook 的最大差異：
+  - 一般 Hook：type = "command"，執行 shell 腳本
+  - Prompt Hook：type = "prompt"，讓 AI 模型當評判官
+
+設定檔：prompt-hook-examples.json 共有 3 個 Prompt Hook：
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Hook 1：Stop（AI 評判 session 結束品質）
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+觸發時機：Claude Code 每次停止回應前
+評判模型：預設（未指定 = claude-haiku 系列）
+評判邏輯：
+  - stop_hook_active = true → 必須回傳 ok: true（煞車保護）
+  - last_assistant_message 含錯誤 → ok: false
+  - 其他 → ok: true
+輸出格式：{"ok": true/false, "reason": "原因"}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Hook 2：UserPromptSubmit（過濾敏感資訊）
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+觸發時機：使用者每次送出 prompt 前
+評判模型：預設
+評判邏輯：
+  - .prompt 欄位含 API key / 密碼 / 個人資料 → ok: false（阻擋）
+  - 無敏感資訊 → ok: true（放行）
+輸出格式：{"ok": true/false, "reason": "原因"}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Hook 3：PostToolUse（安全掃描 .ts/.js 編輯）
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+觸發時機：Claude Code 使用 Edit 或 Write 工具後
+Matcher：Edit|Write（只攔截這兩個工具）
+評判模型：claude-haiku-4-5-20251001（明確指定 Haiku，省成本）
+評判邏輯：
+  - 僅對 .ts 或 .js 檔案檢查
+  - 偵測：SQL 注入、XSS、寫死的憑證
+  - 有問題 → ok: false + 具體原因
+  - 無問題或非適用檔案 → ok: true
+輸出格式：{"ok": true/false, "reason": "原因"}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+關鍵：$ARGUMENTS 佔位符
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Claude Code 觸發 Prompt Hook 時：
+  1. 把事件資料序列化成 JSON 字串
+  2. 把 $ARGUMENTS 替換成這個 JSON 字串
+  3. 把完整 prompt 送給 AI 模型
+  4. AI 模型回傳 {"ok": ..., "reason": ...}
+  5. ok: false → Claude Code 阻擋動作並顯示 reason
+
+生成時間：2026-06-13
