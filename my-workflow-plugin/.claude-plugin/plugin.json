@@ -1,0 +1,9 @@
+{
+  "name": "my-workflow-plugin",
+  "version": "1.0.0",
+  "description": "7 階段工作流：confidence-check + orchestrate + 觀察 Hook",
+  "author": {
+    "name": "Peter Yang"
+  },
+  "license": "MIT"
+}
