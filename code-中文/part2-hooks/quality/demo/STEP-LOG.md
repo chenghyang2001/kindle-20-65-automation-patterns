@@ -19,7 +19,6 @@
 
 **下的命令：**
 
-
 ```bash
 cat demo/messy.json   # 看醜樣
 echo '{"tool_input": {"file_path": "demo/messy.json"}}' | bash demo/auto-format-demo.sh
@@ -32,10 +31,15 @@ cat demo/messy.json   # 看美化後
 
 **實際驗證結果：** ✅ 就地美化成功。腳本三段式走完：jq 挖路徑 → `[ -z ]` 檢查 → `${FILE_PATH##*.}` 取副檔名 → case 命中 `json` → `npx prettier --write`。prettier 自印 `demo/messy.json 27ms`（**27ms** = 可放心掛 PostToolUse 每次寫檔都跑）。
 
+⚠️ **stdout 污染警示**：`npx prettier --write` 計時訊息走 stdout（不是 stderr），現有的 `2>/dev/null` 只吞 stderr。若此 hook 是 `prompt` 型，計時訊息混入 stdout 會讓 Claude 解析 JSON 回應失敗。正確寫法：
+
+```bash
+npx prettier --write "$FILE_PATH" > /dev/null 2>/dev/null
+```
+
 ---
 
 ## Step 2：格式化醜 JS — 看 prettier 整理程式碼
-
 
 **下的命令：**
 
@@ -55,7 +59,6 @@ cat demo/messy.js
 
 ## Step 3：餵局外人 note.txt — 驗證「不關我的事就放行」
 
-
 **下的命令：**
 
 ```bash
@@ -71,7 +74,6 @@ cat demo/note.txt && sha256sum demo/note.txt
 **實際驗證結果：** ✅ 前後指紋都是 `1e70b912fe71...aedd9bf`，**連一個位元組都沒動**。case 四個分支全沒命中 → 默默 exit 0。白名單思維：認識的才處理，不認識的安全放行（不報錯、不雞婆亂改）。
 
 ---
-
 
 ## Step 4：餵「沒有 file_path」的 JSON — 驗證提前離場
 
