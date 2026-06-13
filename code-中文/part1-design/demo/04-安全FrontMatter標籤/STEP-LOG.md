@@ -43,7 +43,10 @@
 
 ### 實際結果
 
-（演練時填入）
+- 安全標籤：`disable-model-invocation: true`
+- 效果：AI 知道這個 Skill 存在，但無法自動觸發；人類必須輸入 `/deploy` 顯式呼叫
+- 沒有標籤時的誤觸情境：開發者說「功能做好了可以上線」→ AI 誤判情境相符 → 自動 push main
+- 有標籤後唯一觸發方式：使用者手動輸入 `/deploy` 指令
 
 ---
 
@@ -76,7 +79,10 @@
 
 ### 實際結果
 
-（演練時填入）
+- 安全標籤：`user-invocable: false`
+- 內容摘要：2008 年舊版付款系統的技術背景與限制（PHP 5.6、Shift-JIS、XML-RPC）
+- 效果：Skill 選單對人類隱藏；AI 可見並遇到相關任務自動讀入參考
+- 沒有此標籤的問題：選單噪音、使用者認知負擔、背景資料混在可操作 Skill 裡造成誤用
 
 ---
 
@@ -114,7 +120,14 @@
 
 ### 實際結果
 
-（演練時填入）
+| 標籤 | 設計目的 | 誰看不到 | 誰看得到 | 適合場景 |
+|------|---------|---------|---------|---------|
+| `disable-model-invocation: true` | 防 AI 自動觸發高危操作 | AI 無法觸發 | 人類（/指令顯式呼叫）| 部署、刪除、發布 |
+| `user-invocable: false` | 對人類隱藏，保留 AI 參考 | 人類（選單消失）| AI（自動讀入）| 內部文件、技術背景 |
+
+- Q1：兩個都加 → 選單隱藏 + AI 無法觸發，只有知道指令名的人才能 /skill-name 召喚
+- Q2（disable-model-invocation）：✅清空測試DB、✅發布到npm、✅強制merge main
+- Q3（user-invocable: false）：✅API設計慣例30頁、✅舊版付款系統背景、✅公司技術債清單
 
 ---
 
@@ -167,7 +180,23 @@ ___________: ___________   ← （這個需要兩個標籤）
 
 ### 實際結果
 
-（演練時填入）
+```yaml
+# Skill A — 破壞性，管理員手動確認
+name: delete-s3-backups
+description: 刪除 30 天前的 S3 備份檔案。必須由管理員透過 /delete-s3-backups 顯式呼叫。
+disable-model-invocation: true
+
+# Skill B — 背景參考，選單隱藏
+name: aws-account-context
+description: AWS 帳號結構與 IAM 權限說明。AI 處理基礎設施任務時自動參考。
+user-invocable: false
+
+# Skill C — 最高風險，雙重鎖
+name: restart-production
+description: 重啟所有 Production 服務。僅限緊急情況，必須透過 /restart-production 顯式呼叫。
+disable-model-invocation: true
+user-invocable: false
+```
 
 ---
 
