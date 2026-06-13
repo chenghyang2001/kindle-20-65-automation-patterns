@@ -161,18 +161,31 @@ echo '{"tool_name": "mcp__filesystem__write", "tool_input": {"path": "/app/confi
 
 ---
 
-## Step 3：守備範圍總測 — 三敏感檔 + read/內建工具對照
+## Step 3：守備範圍總測 — 三敏感副檔名 × 三動詞 + 破口驗證
 
-**命令：** 8 種組合（3 副檔名 × MCP write/delete/move + mcp read + 內建 Write/Edit）。
+**命令：** 5 種組合（write/delete/move 敏感檔 + mcp read + 內建 Write）：
+
+```bash
+# 三種敏感副檔名 × 三種動詞（2>/dev/null 吞 stderr，只看 stdout）
+echo '{"tool_name":"mcp__filesystem__write","tool_input":{"path":"/app/.pem"}}' | bash security/demo/mcp-write-guard-demo.sh 2>/dev/null; echo $?
+echo '{"tool_name":"mcp__filesystem__delete","tool_input":{"path":"/app/id_rsa.key"}}' | bash security/demo/mcp-write-guard-demo.sh 2>/dev/null; echo $?
+echo '{"tool_name":"mcp__filesystem__move","tool_input":{"path":"/app/.env"}}' | bash security/demo/mcp-write-guard-demo.sh 2>/dev/null; echo $?
+# 破口驗證
+echo '{"tool_name":"mcp__filesystem__read","tool_input":{"path":"/app/.env"}}' | bash security/demo/mcp-write-guard-demo.sh 2>/dev/null; echo $?
+echo '{"tool_name":"Write","tool_input":{"file_path":"/app/.env"}}' | bash security/demo/mcp-write-guard-demo.sh 2>/dev/null; echo $?
+```
+
 **目的：** 看清守備邊界與破口。
-**預期：** MCP 寫/刪/移敏感檔擋；其他放行。
-**實際驗證：** ✅ 前 5 行擋（regex 一條罩三動詞×三副檔名），**後 3 行暴露破口**：
+**預期：** MCP 寫/刪/移敏感檔擋；read 和內建 Write 放行。
+
+⚠️ **jq 換行陷阱**：在 terminal 分兩行貼 `| jq '.field'` 時，第二行被 shell 當成獨立指令 → exit 127。管道後的 jq 必須和前面指令在同一行。
+
+**實際驗證：** ✅ 三個 MCP 寫/刪/移皆回傳 deny JSON（stdout）+ exit 0；**後 2 行暴露破口**：
 
 | 漏網 | 為何放行 | 是漏洞？ |
 |------|---------|---------|
 | `mcp__filesystem__read` 讀 .env | 清單只有 write/delete/move，沒 read | ⚠️ 是！偷讀外洩一樣致命 |
 | 內建 `Write` 寫 .env | 第一關 `mcp__filesystem__` 不匹配 | 🔶 設計如此，破口真實 |
-| 內建 `Edit` 寫 .env | 同上 | 🔶 同上 |
 
 **縱深防禦結論：** 單一 hook 只守一段邊界。要真正保護 .env 還需要：① 把 read 加進清單 ② 另一支守內建 Write/Edit 的 hook。新手安全錯覺：「我擋了 write 就安全」← read 大開、正門大開。
 
@@ -183,17 +196,15 @@ echo '{"tool_name": "mcp__filesystem__write", "tool_input": {"path": "/app/confi
 **命令：**
 
 ```bash
-# A. 用 jq 拆解 deny JSON 每個欄位
-echo '{"tool_name": "mcp__filesystem__write", "tool_input": {"path": "/app/.env"}}' \
-  | bash demo/mcp-write-guard-demo.sh 2>/dev/null | jq -r '.hookSpecificOutput | ...'
-# B. 生成 ask 版變體（守備 .sql 遷移腳本，決定改 ask），餵 migration.sql
-echo '{"tool_name": "mcp__filesystem__write", "tool_input": {"path": "/db/migration.sql"}}' \
-  | bash demo/mcp-ask-demo.sh
+# A. 用 jq 拆解 deny JSON（單行，避免換行陷阱）
+echo '{"tool_name":"mcp__filesystem__write","tool_input":{"path":"/app/.env"}}' | bash security/demo/mcp-write-guard-demo.sh 2>/dev/null | jq '.hookSpecificOutput'
+# B. ask 版（守備 .sql 遷移腳本）
+echo '{"tool_name":"mcp__filesystem__write","tool_input":{"path":"/db/migration.sql"}}' | bash security/demo/mcp-ask-demo.sh 2>/dev/null
 ```
 
 **目的：** 拆解 deny JSON 逐欄解釋，示範改成 `ask` 的灰色地帶情境。
 **預期：** A 印出三欄位；B 吐出 `permissionDecision: ask` 的 JSON。
-**實際驗證：** ✅ 兩部分都到位。
+**實際驗證：** ✅ 兩部分都到位（A：jq 以單行跑出三欄位；B：mcp-ask-demo.sh 確認存在且回傳 ask JSON）。
 
 **A. deny JSON 三欄位：**
 
