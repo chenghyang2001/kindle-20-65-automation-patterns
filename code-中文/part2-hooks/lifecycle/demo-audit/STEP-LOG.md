@@ -26,13 +26,14 @@
 **命令：**
 
 ```bash
-echo '{"source": "user_settings", "file_path": "/home/user/.bashrc"}' | bash demo-audit/audit-config-demo.sh
-cat demo-audit/config-audit.log
+echo '{"source": "user_settings", "file_path": "/home/user/.bashrc"}' | bash lifecycle/demo-audit/audit-config-demo.sh
+echo $?
+cat lifecycle/demo-audit/config-audit.log
 ```
 
 **目的：** 看「稽核但不擋路」。
 **預期：** log 多一行，exit 0 不阻擋。
-**實際驗證：** ✅ log 記 `時間 | user_settings | /home/user/.bashrc`，exit 0。腳本先無條件記 log，再判斷 `if [ "$SOURCE" = "project_settings" ]`；這次 source 是 user_settings 不符 → 整段阻擋跳過。
+**實際驗證：** ✅ exit 0，stdout 空白（只記 log，沒有 block JSON）。log 累積型（append）新增 `2026-06-14 08:07:22 | user_settings | /home/user/.bashrc`，舊歷史保留。腳本先無條件記 log（`tee -a`），再判斷 source；user_settings 不符 → 阻擋跳過。即使放行，稽核軌跡已留下。
 
 ---
 
@@ -41,16 +42,19 @@ cat demo-audit/config-audit.log
 **命令：**
 
 ```bash
-echo '{"source": "project_settings", "file_path": "/app/.claude/settings.json"}' | bash demo-audit/audit-config-demo.sh
-tail -1 demo-audit/config-audit.log
+echo '{"source": "project_settings", "file_path": "/app/.claude/settings.json"}' | bash lifecycle/demo-audit/audit-config-demo.sh
+echo $?
+tail -2 lifecycle/demo-audit/config-audit.log
 ```
 
 **目的：** 看防護網啟動，稽核與阻擋同時發生。
 **預期：** stderr 警告 + `decision: block` JSON + log 也記一筆。
 **實際驗證：** ✅ 兩件事同發：
 
-- stdout 吐 `{decision: block, reason: ...}`，**exit code = 0**（決定在 JSON 裡，呼應第 6 課）
-- log 同步記下這筆「有人試圖改 settings.json」
+- stderr：`偵測到設定檔遭外部修改：/app/.claude/settings.json`
+- stdout：`{"decision":"block","reason":"偵測到 settings.json 遭外部修改。請先檢視變更內容再繼續。"}`（**扁平格式**，對比第 6 課的巢狀 hookSpecificOutput）
+- exit code = 0（決定在 JSON 裡，呼應第 6 課）
+- log 同步記下 `2026-06-14 08:08:26 | project_settings | /app/.claude/settings.json`
 - **「先記錄、後判斷」**：即使觸發 block，證據已留下（擋不住至少留痕 = 縱深）
 - 攻擊鏈：AI 想繞過安全 hook → 改 settings.json 移除它 → 改的動作本身被 audit 擋下 + 留證
 
@@ -58,7 +62,21 @@ tail -1 demo-audit/config-audit.log
 
 ## Step 3：稽核日誌累積 — 證據鏈
 
-**命令：** 連餵 5 筆不同來源變更（heredoc 迴圈）。
+**命令：**
+
+```bash
+for payload in \
+  '{"source":"project_settings","file_path":"/app/.claude/settings.json"}' \
+  '{"source":"user_settings","file_path":"/home/user/.zshrc"}' \
+  '{"source":"mcp_config","file_path":"/app/.mcp.json"}' \
+  '{"source":"project_settings","file_path":"/app/.claude/settings.local.json"}' \
+  '{"source":"local_settings","file_path":"/totally/different/path/settings.json"}'; do
+  echo "$payload" | bash lifecycle/demo-audit/audit-config-demo.sh 2>/dev/null
+  echo "exit $?"
+done
+tail -6 lifecycle/demo-audit/config-audit.log
+```
+
 **目的：** 看 log 累積成可追溯的稽核軌跡。
 **預期：** 只有 settings.json 那筆 BLOCK，其餘放行；log 累積。
 **實際驗證：** ✅ 5 筆只 1 筆 BLOCK，log 累積 7 筆（按時間排序的證據鏈）。
@@ -73,10 +91,13 @@ tail -1 demo-audit/config-audit.log
 **命令：**
 
 ```bash
-# A. 並排兩課的 block JSON
-echo '{...settings.json}' | bash demo-audit/audit-config-demo.sh        # decision:block
-echo '{...mcp__filesystem__write .env}' | bash ../security/demo/mcp-write-guard-demo.sh  # permissionDecision:deny
-# B. 邊界：不同路徑 / 大小寫
+# A. 兩課 block 格式並排
+echo '{"source":"project_settings","file_path":"/app/.claude/settings.json"}' | bash lifecycle/demo-audit/audit-config-demo.sh 2>/dev/null
+echo '{"tool_name":"mcp__filesystem__write","tool_input":{"path":"/app/.env"}}' | bash security/demo/mcp-write-guard-demo.sh 2>/dev/null
+# B. 大小寫邊界測試
+echo '{"source":"project_settings","file_path":"/app/.claude/Settings.json"}' | bash lifecycle/demo-audit/audit-config-demo.sh 2>/dev/null; echo $?
+echo '{"source":"project_settings","file_path":"/app/.claude/settings.JSON"}' | bash lifecycle/demo-audit/audit-config-demo.sh 2>/dev/null; echo $?
+echo '{"source":"project_settings","file_path":"/totally/different/path/settings.json"}' | bash lifecycle/demo-audit/audit-config-demo.sh 2>/dev/null; echo $?
 ```
 
 **目的：** 釐清「同是擋，格式為何不同」+ 找更多盲點。
