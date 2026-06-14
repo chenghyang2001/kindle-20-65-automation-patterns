@@ -1,0 +1,35 @@
+// 第二層：DOT 圖視覺化層
+// 目的：給人看，讓所有人（含非 Claude）快速理解 pipeline 結構
+// 指令：dot -Tpng workflow.dot -o workflow.png
+
+digraph code_review_pipeline {
+  rankdir=LR;
+  node [shape=box];
+
+  start        [label="開始\n（PR 提交）", shape=oval];
+  explore      [label="程式碼探索\n(Explore agent / Haiku)"];
+  spec         [label="規格遵循\n(spec-compliance-reviewer)"];
+  quality      [label="品質審查\n(code-quality-reviewer)"];
+  security     [label="安全性審查\n(security-reviewer)"];
+  api          [label="API 設計審查\n(api-reviewer)"];
+  fix          [label="修正問題\n(實作者)"];
+  done         [label="完成\n（可合併）", shape=oval];
+
+  start    -> explore;
+  explore  -> spec;
+
+  spec     -> fix     [label="FAIL"];
+  spec     -> quality [label="PASS"];
+
+  quality  -> fix      [label="Critical"];
+  quality  -> security [label="PASS"];
+
+  security -> fix [label="Critical"];
+  security -> api [label="PASS"];
+
+  api -> fix  [label="Critical"];
+  api -> done [label="PASS"];
+  api -> done [label="超時（帶警告）", style=dashed, color=orange];
+
+  fix -> spec [label="修完重驗（從第一關）"];
+}
