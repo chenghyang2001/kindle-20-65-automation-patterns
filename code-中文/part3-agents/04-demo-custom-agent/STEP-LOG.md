@@ -1,119 +1,136 @@
-# 第 4 課演練記錄：建立並呼叫自訂 Agent
+# 第 4 課演練記錄：建立自訂 Agent
 
-> 整合 agents/ 目錄所有範例，第一次親手建 agent 並呼叫
-
-## 課程目標
-
-完整走一遍「設計 → 建立 → 部署 → 呼叫」的流程，
-建立一個能真正運作的 pm25-log-finder agent（搜尋 PM2.5 log 關鍵字）。
-
-## 工作目錄
-
-`code-中文/part3-agents/demo-custom-agent/`
+> 對應文件：`04-demo-custom-agent/pm25-log-finder.md`
+> 主題：搜尋類 agent 的四元素設計公式 + 領域知識注入 + 觸發詞語意
 
 ---
 
-## Step 1：設計 agent frontmatter
+## 核心觀念
 
-### 目標 agent：pm25-log-finder
+自訂 agent 的本質：把**領域知識**注入通用模型，讓 Haiku 變成「懂特定業務的搜尋專家」。
+設計公式：領域觸發詞 + 輸出格式約束 + 領域知識注入 + 主動兩字 = 自動化 agent。
+
+---
+
+## Step 1：讀 pm25-log-finder — 解析三要素
+
+**命令：**
+
+```bash
+cat code-中文/part3-agents/04-demo-custom-agent/pm25-log-finder.md
+```
+
+**實際驗證：** ✅
+
+| 項目 | 內容 |
+|------|------|
+| **description / 觸發時機** | 查找 PM2.5 感測器異常、場域問題、998 錯誤時 |
+| **tools** | Read, Grep, Glob（唯讀三件套）|
+| **model** | haiku（搜尋任務，符合第 3 課矩陣）|
+| **系統提示任務** | 找含關鍵字的行，回傳「原始內容 + 行號 + 檔案路徑」，不做分析 |
+
+**最關鍵的那一行系統提示**：
+
+```
+998 = 感測器故障，不是真實污染值，請特別標記。
+```
+
+這是**領域知識注入**。Haiku 不知道 AIHCR 系統的 998 代表什麼，透過系統提示把業務規則寫進去，讓通用模型變成「懂 PM2.5 監控的專家」。這是自訂 agent vs 內建 agent 的核心差異。
+
+---
+
+## Step 2：搜尋類 agent 的「專業化三元素」
+
+從 pm25-log-finder 拆解出自訂 agent 的設計模板，並對比費用異常 agent：
+
+| 元素 | pm25-log-finder | 費用異常 agent |
+|------|-----------------|----------------|
+| **領域觸發詞** | 「AIHCR log」「PM2.5 異常」「998 錯誤」| 「超額費用」「SUSPICIOUS 標記」「稽核異常」|
+| **輸出格式約束** | 「回傳原始內容 + 行號 + 檔案路徑」| 同上 + 「觸發條件標籤（超額/標記）」|
+| **領域知識注入** | 「998 = 感測器故障，不是真實污染值」| 「$10,000 閾值；欄位名稱可能是 amount / 金額 / 費用」|
+
+**欄位別名是三元素中最難的**：「欄位名稱可能是 amount / 金額 / 費用，三種都要掃」— Haiku 不知道這個系統的 CSV 欄位命名慣例，沒有注入就只掃英文欄位，中文 CSV 全部漏掉。
+
+---
+
+## Step 3：組裝完整 agent frontmatter
+
+**費用異常搜尋 agent 的完整設計：**
 
 ```markdown
 ---
-name: pm25-log-finder
+name: expense-anomaly-finder
 description: >
-  快速在 AIHCR log 檔案中搜尋 PM2.5 數值異常或 998 錯誤碼。
-  查找感測器異常、場域問題時主動使用。
+  快速搜尋費用報表中的金額異常或可疑紀錄。
+  需要查找超額費用、SUSPICIOUS 標記、或稽核異常時主動使用。
 tools: Read, Grep, Glob
 model: haiku
 ---
 
-你是 PM2.5 log 搜尋專家。
-找到含有指定關鍵字的行並回傳原始內容 + 行號 + 檔案路徑。
-998 = 感測器故障，不是真實污染值，請特別標記。
-不做額外分析，只做搜尋。
+你是費用報表異常搜尋專家。
+找到符合條件的行並回傳：原始內容 + 行號 + 檔案路徑 + 觸發條件（超額/標記）。
+
+規則：
+- 金額超過 10000 元為異常閾值，必須標記 [OVER_LIMIT]
+- 含 SUSPICIOUS 欄位的紀錄必須標記 [SUSPICIOUS]
+- CSV 金額欄位名稱可能是 amount / 金額 / 費用，三種都要掃
+
+不做判斷，只做搜尋回傳。
 ```
 
-### 說明
+**設計決策說明：**
 
-（演練時填入：為何選 haiku？tools 為何不含 Bash？）
+| 決策 | 選擇 | 原因 |
+|------|------|------|
+| model | haiku | 搜尋任務，無需推理，符合第 3 課矩陣 |
+| tools | Read, Grep, Glob | 只讀 CSV，不需寫入或執行指令 |
+| permissionMode | 無（預設）| 不是安全稽核，不需鎖死唯讀模式 |
+| 系統提示末句 | 「不做判斷，只做搜尋回傳」| 壓縮輸出 token，同 log-searcher 降本技巧 |
+
+**搜尋類 agent 標準模板**：
+
+```
+haiku + 唯讀三件套（Read/Grep/Glob）+ 領域知識注入 + 不分析只回傳
+```
 
 ---
 
-## Step 2：建立 agent 檔案
+## Step 4：「主動使用」兩字的語意效力
 
-### 部署路徑
+**兩種 description 寫法的行為差異：**
+
+| | 寫法 A：「主動使用」| 寫法 B：「可以使用」|
+|--|--------------------|--------------------|
+| Claude 解讀 | 這個情境**應該**呼叫 | 這個情境**允許**呼叫（但不強制）|
+| 實際行為 | Claude 看到觸發條件就自動派出 | 可能等使用者明確要求才呼叫 |
+| 自動化程度 | 高（無需明確指示）| 低（需要被動等待）|
+
+「主動」= 授權 Claude 自行判斷並觸發，是 agent 自動化的關鍵字。去掉這兩個字，agent 退化成「被呼叫的工具」，而非「主動協作的成員」。
+
+**三種 description 品質對照：**
 
 ```
-~/.claude/agents/pm25-log-finder.md    ← 全域可用
+❌ 自我介紹：「我是費用搜尋專家，我能找出 CSV 的異常。」
+   → Claude 讀不出觸發時機，不會呼叫
+
+⚠️ 能力描述：「能搜尋費用報表中的金額異常。」
+   → Claude 知道能做，但不知道應該主動做
+
+✅ 觸發條件：「需要查找超額費用、SUSPICIOUS 標記時主動使用。」
+   → Claude 配對情境 + 主動派出
 ```
 
-或
-
-```
-<project>/.claude/agents/pm25-log-finder.md  ← 只在該專案可用
-```
-
-### 建立指令
-
-```bash
-mkdir -p ~/.claude/agents
-# 將設計好的 .md 存入
-```
-
-### 實際結果
-
-（演練時填入）
+**結論**：description = 「何時（觸發詞）」+ 「主動（授權詞）」缺一不可。
 
 ---
 
-## Step 3：呼叫 agent（在 Claude Code 互動模式）
+## 第 4 課四 Step 對照
 
-### 指令
+| Step | 主題 | 關鍵收穫 |
+|------|------|---------|
+| 1 | 讀 pm25-log-finder | 領域知識注入是自訂 agent 的核心價值 |
+| 2 | 三元素拆解 | 觸發詞 + 輸出格式 + 領域知識 = 專業化模板 |
+| 3 | 組裝 frontmatter | 搜尋類 agent 有標準模板可複用 |
+| 4 | 「主動」語意 | description 必須含觸發詞 + 主動授權詞 |
 
-```bash
-# 在 Claude Code 互動模式下：
-Use pm25-log-finder to search for "998" in code-中文/
-```
-
-### 預期行為
-
-1. Claude 識別到「search for 998」→ 觸發 pm25-log-finder
-2. Agent 用 Grep 搜尋
-3. 回傳搜尋結果（含行號）
-4. 退出 agent session，結果回到主 context
-
-### 實際結果
-
-（演練時填入）
-
----
-
-## Step 4：驗證單層委派鐵律
-
-### 關鍵規則
-
-**Sub-agent 不能再派 sub-agent。**
-
-```
-主對話 → agent（第 1 層）→ ✅ 允許
-agent（第 1 層）→ agent（第 2 層）→ ❌ 禁止
-```
-
-### 驗證方式
-
-觀察 pm25-log-finder 的 tools 清單：
-`Read, Grep, Glob` → 沒有 `Task` 工具 → 無法派出 sub-agent。
-
-這是設計上的保護，不是 bug。
-
----
-
-## 本課重點
-
-| 步驟 | 關鍵動作 |
-|------|---------|
-| 設計 description | 寫觸發條件，不是自我介紹 |
-| 選 model | 搜尋任務 → haiku |
-| 限制 tools | 只給需要的（最小權限原則） |
-| 部署路徑 | `~/.claude/agents/` 全域；`.claude/agents/` 專案 |
-| 呼叫方式 | Claude 自動觸發 or 直接說 "Use <name>" |
+**產出物：** `pm25-log-finder.md`（分析對象）、`expense-anomaly-finder`（設計練習）
