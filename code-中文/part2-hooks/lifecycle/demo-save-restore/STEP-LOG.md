@@ -27,8 +27,8 @@
 **命令：**
 
 ```bash
-echo '{"trigger": "manual_test"}' | bash demo/save-session-state-demo.sh
-cat demo/session-state.md
+echo '{"trigger": "manual_test"}' | bash lifecycle/demo-save-restore/save-session-state-demo.sh
+cat lifecycle/demo-save-restore/session-state.md
 ```
 
 **目的：** 看 save 怎麼把會在 compact 遺失的東西用 git 指令打撈出來寫進實體檔。
@@ -42,6 +42,8 @@ cat demo/session-state.md
 | 未 commit 變更 | `git diff --name-only` + `--cached`（加 `[staged]` 標記）|
 | 最近 commit | `git log --oneline -5` |
 
+⚠️ **自指現象**：save 剛寫的 session-state.md 本身就出現在「未 Commit 的變更」裡（git diff 看到它被修改了）。真實環境中把狀態檔放進 `.gitignore` 可避免此現象。
+
 ⚠️ 注意：save 用 `git diff`（**只看已追蹤檔案**），所以 untracked 新檔不會出現（Step 4 改已追蹤檔才看得到效果）。
 
 ---
@@ -51,12 +53,18 @@ cat demo/session-state.md
 **命令：**
 
 ```bash
-bash demo/restore-context-demo.sh
+bash lifecycle/demo-save-restore/restore-context-demo.sh
 ```
 
 **目的：** 看 restore 的 stdout（真實環境會被注入 AI context）。
 **預期：** 輸出「已還原的 Session 上下文」+ 分支 + commit + 上次狀態檔。
 **實際驗證：** ✅ 輸出和「每次發訊息上方的 Restored Session Context」幾乎一樣（親眼看到天天在用的機制原始碼）。
+
+**兩條時間線並列展示（本次演練實際觀察到）：**
+
+- **即時 git（此刻）**：最新 commit 是 `73ddae1`（Step 1 commit）
+- **上次存檔（07:59）**：最新 commit 還是 `53e1c95`，且 session-state.md 仍「未 commit」
+- 一比就知道中間發生什麼：session-state.md 從「未 commit」變成了「已 commit 進 73ddae1」
 
 - **SessionStart 特殊能力**：唯獨它的 stdout 會變成 AI 醒來讀到的第一段記憶
 - **兩種資訊合併**：即時查 git（反映「此刻」）+ 讀 session-state.md（反映「上次存檔當下」）→ 一比就知道中間發生什麼
@@ -69,9 +77,9 @@ bash demo/restore-context-demo.sh
 **命令：**
 
 ```bash
-cat -n demo/save-session-state-demo.sh
-printf '' | bash demo/save-session-state-demo.sh          # 實測保險二：空輸入
-# 實測保險三：故意讓寫入到不存在的目錄失敗
+cat -n lifecycle/demo-save-restore/save-session-state-demo.sh | head -40
+printf '' | bash lifecycle/demo-save-restore/save-session-state-demo.sh
+echo $?
 ```
 
 **目的：** 看這支「12 支裡防禦最完整」的腳本怎麼處理異常。
@@ -94,10 +102,12 @@ printf '' | bash demo/save-session-state-demo.sh          # 實測保險二：�
 **命令：**
 
 ```bash
-echo "..." > demo/work-in-progress.txt && git add demo/work-in-progress.txt   # 製造 staged 變更
-echo '{"trigger": "before_compact"}' | bash demo/save-session-state-demo.sh    # 拍快照
-bash demo/restore-context-demo.sh                                              # 讀回
-git reset demo/work-in-progress.txt && rm demo/work-in-progress.txt            # 還原不留痕跡
+echo "進行中的工作" > lifecycle/demo-save-restore/work-in-progress.txt
+git add lifecycle/demo-save-restore/work-in-progress.txt
+echo '{"trigger": "before_compact"}' | bash lifecycle/demo-save-restore/save-session-state-demo.sh
+cat lifecycle/demo-save-restore/session-state.md
+# 演練後清理（session-state.md 變動需 commit；work-in-progress.txt reset + rm）
+git reset lifecycle/demo-save-restore/work-in-progress.txt && rm lifecycle/demo-save-restore/work-in-progress.txt
 ```
 
 **目的：** 完整重現失憶→記憶循環，讓「未 commit 變更」區塊真的有東西。
