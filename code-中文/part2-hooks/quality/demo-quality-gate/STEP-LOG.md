@@ -1,104 +1,88 @@
 # 第 9 課演練記錄：quality-gate.sh
 
-> 範例檔：`quality/quality-gate.sh`（Stop event 品質守衛）
-
-## 課程目標
-
-學習如何用 Stop hook 在 Claude Code **每次停止回應前**自動執行品質檢查，
-並透過 `stop_hook_active` 旗標避免 hook 呼叫自身造成的**無限迴圈**。
-
-## 工作目錄
-
-`code-中文/part2-hooks/quality/demo-quality-gate/`
+> 範例檔：`quality/quality-gate.sh`
+> demo 腳本：`quality-gate-demo.sh`（修改：log 路徑 + 使用 demo 目錄）
+> 事件：**Stop**（Claude Code 每次停止回應前）｜ 難度：⭐⭐⭐
+> 主題：AI 做完事之前先自我把關 — 擋下有未 commit 變更的 session
 
 ---
 
-## Step 1：測試無限迴圈煞車（stop_hook_active = true）
-
-### 指令
-
-```bash
-cd <專案根目錄>
-echo '{"stop_hook_active": true}' | bash "code-中文/part2-hooks/quality/demo-quality-gate/quality-gate-demo.sh"
-echo "exit_code=$?"
-```
-
-### 目的
-
-驗證 Stop hook 的**自我保護機制**：
-當 Claude Code 本身因為呼叫 Stop hook 而觸發另一個 Stop 事件時，
-`stop_hook_active` 會被設為 `true`，腳本應立即 `exit 0` 不做任何檢查。
-
-### 預期效果
-
-- **stdout 完全空白**（不輸出任何 JSON）
-- exit code = 0
-
-### 實際驗證結果 ✅
+## 核心觀念
 
 ```
-exit_code=0
+正常流程：Stop 事件觸發 → quality-gate.sh 跑 → exit 0 → Claude 結束
+防護流程：Stop 事件觸發 → 偵測到 git 有未 commit 變更 → block JSON → Claude 被阻止結束 + 強制提醒
 ```
 
-stdout 為空，煞車機制正確生效。
+**Stop hook 的 block 格式**：和第 8 課 Settings-change 一樣，用扁平 `{"decision":"block","reason":"..."}` JSON + exit 0。
+不是 PreToolUse 的巢狀 `hookSpecificOutput`（第 6 課），也不是單純 exit 2（第 4 課）。
 
 ---
 
-## Step 2：乾淨狀態應安靜通過（stop_hook_active = false）
+## Step 1：乾淨狀態 — 安靜放行
 
-### 指令
+**命令：**
 
 ```bash
-cd <專案根目錄>
-git diff --name-only && git diff --name-only --cached
-echo '{"stop_hook_active": false}' | bash "code-中文/part2-hooks/quality/demo-quality-gate/quality-gate-demo.sh"
-echo "exit_code=$?"
+git status --short
+echo '{"stop_reason": "end_turn"}' | bash quality/demo-quality-gate/quality-gate-demo.sh
+echo $?
 ```
 
-### 目的
-
-驗證在**無任何 staged/unstaged 變更**的乾淨狀態下，
-品質門全部通過，hook 安靜退出（不阻擋 Claude Code）。
-
-### 預期效果
-
-- `git diff` 無輸出（沒有未追蹤的變更）
-- **stdout 完全空白**
-- exit code = 0
-
-### 實際驗證結果 ✅
-
-```
-(no staged/unstaged changes to tracked files)
-exit_code=0
-```
-
-無 staged/unstaged 變更、無 `src/` 底下的 TODO → 品質門全過，安靜通過。
+**目的：** 確認 working tree 乾淨時 quality-gate 安靜放行。
+**預期：** `git status` 無輸出、exit 0、stdout 空白。
+**實際驗證：** ✅ 全部沉默，三個都空。Stop hook 的設計哲學：「沒問題就不打擾你」。
 
 ---
 
-## Step 3：製造 staged 變更，驗證 block JSON 輸出
+## Step 2：製造未追蹤新檔案 — 發現盲點
 
-### 指令
+**命令：**
 
 ```bash
-cd <專案根目錄>
-# 製造 staged 變更
-echo "# quality-gate demo test file" > quality-gate-test.tmp
-git add quality-gate-test.tmp
-git diff --name-only --cached    # 確認 staged
-
-# 執行 hook
-echo '{"stop_hook_active": false}' | bash "code-中文/part2-hooks/quality/demo-quality-gate/quality-gate-demo.sh"
-echo "exit_code=$?"
+echo "測試未存檔" > quality/demo-quality-gate/dirty.txt
+echo '{"stop_reason": "end_turn"}' | bash quality/demo-quality-gate/quality-gate-demo.sh
+echo $?
+# 清理
+rm quality/demo-quality-gate/dirty.txt
 ```
 
-### 目的
+**目的：** 看 quality-gate 能不能偵測未存的新檔案。
+**預期（事前）：** 以為會 block。
+**實際驗證：** ⚠️ **exit 0（盲點！）**
 
-驗證當有**未 commit 的 staged 變更**時，
-hook 正確輸出 `decision: block` 的 JSON，告知 Claude Code 停止並顯示原因。
+`dirty.txt` 是全新未追蹤檔案（git status 顯示 `??`），但腳本只用：
 
-### 預期效果
+```bash
+UNCOMMITTED=$(git diff --name-only 2>/dev/null)    # 已追蹤檔案的修改
+STAGED=$(git diff --name-only --cached 2>/dev/null) # 已 git add 的暫存
+```
+
+| 指令 | 看得見 | 看不見 |
+|------|--------|--------|
+| `git diff --name-only` | 已追蹤檔案的改動 | **未追蹤新檔案（??）** |
+| `git diff --cached` | git add 暫存 | 未追蹤新檔案 |
+| `git status --porcelain` | **全部（含 ??）** | — |
+
+→ 和第 4、8 課同教訓：精確比對有「換個角度就漏」的盲點。修法：改用 `git status --porcelain | grep -v '^??'` 或把 `??` 也納入。
+
+---
+
+## Step 3：修改已追蹤檔案 — 觸發 block
+
+**命令：**
+
+```bash
+echo "# 測試改動" >> quality/auto-format.sh
+echo '{"stop_reason": "end_turn"}' | bash quality/demo-quality-gate/quality-gate-demo.sh
+echo $?
+# 清理
+git checkout quality/auto-format.sh
+```
+
+**目的：** 修改已追蹤的檔案，讓 `git diff` 真的看到，觸發 block。
+**預期：** stdout 吐 block JSON + exit 0。
+**實際驗證：** ✅
 
 ```json
 {
@@ -107,79 +91,55 @@ hook 正確輸出 `decision: block` 的 JSON，告知 Claude Code 停止並顯�
 }
 ```
 
-### 實際驗證結果 ✅
-
-```
-quality-gate-test.tmp
-
-{
-  "decision": "block",
-  "reason": "1. 偵測到未 commit 的變更"
-}
-exit_code=0
-```
-
-品質門偵測到問題，輸出帶編號清單的 block JSON。Claude Code 收到後會停止並把 reason 顯示給使用者。
+exit code = 0。block 決定在 JSON 裡，不在 exit code — 和第 8 課 audit-config 同格式，和第 4 課 exit 2 完全不同。
 
 ---
 
-## Step 4：同樣有問題但 stop_hook_active=true → 煞車介入
+## Step 4：stop_hook_active 防無限迴圈
 
-### 指令
+**命令：**
 
 ```bash
-cd <專案根目錄>
-# 此時 quality-gate-test.tmp 仍是 staged 狀態
-echo '{"stop_hook_active": true}' | bash "code-中文/part2-hooks/quality/demo-quality-gate/quality-gate-demo.sh"
-echo "exit_code=$?"
+# A. 帶防護旗標 → 直接提前離場
+echo '{"stop_reason": "end_turn", "stop_hook_active": true}' | bash quality/demo-quality-gate/quality-gate-demo.sh
+echo $?
 
-# 清理：還原並刪除測試檔
-git reset HEAD quality-gate-test.tmp
-rm quality-gate-test.tmp
+# B. 清理，確認 working tree 乾淨
+rm -f quality/demo-quality-gate/dirty.txt
+git status --short
 ```
 
-### 目的
+**目的：** 理解 `stop_hook_active` 為何存在。
+**預期：** A → 無輸出 + exit 0；B → 乾淨。
+**實際驗證：** ✅ A 沉默 exit 0；B git status 無輸出。
 
-對比 Step 3 和 Step 4：**相同的問題狀態**，
-只差一個旗標（`stop_hook_active: true`），結果完全不同。
-
-這演示了為什麼 Stop hook 必須有煞車：
-> Claude Code 呼叫 Stop hook → hook 回傳 block → Claude Code 再次嘗試停止 → 再次觸發 Stop hook…
-> 沒有煞車 = 無限迴圈。
-
-### 預期效果
-
-- **stdout 完全空白**（煞車直接跳過所有檢查）
-- exit code = 0
-
-### 實際驗證結果 ✅
+**為什麼需要這個旗標：**
 
 ```
-exit_code=0
+Claude Code 停止 → 觸發 Stop hook → hook 回傳 block → Claude 再次嘗試停止
+→ 再次觸發 Stop hook → 再次 block → ... 無限迴圈
 ```
 
-即使有 staged 變更，煞車讓 hook 直接通過。測試用的 `quality-gate-test.tmp` 已清理，repo 恢復乾淨狀態。
+Claude Code 在「因 hook block 被迫繼續」的情況下再次嘗試停止時，會把 `stop_hook_active: true` 注入 payload，腳本第 6 行偵測到後直接 exit 0，打破迴圈。這是「防護網的防護網的防護網」。
 
 ---
 
-## 本課重點總結
+## 第 9 課四 Step 對照
 
-| 觀念 | 說明 |
-|------|------|
-| Stop hook 時機 | Claude Code **每次停止輸出前**都會觸發 |
-| `stop_hook_active` 旗標 | 防止 Stop hook 自己呼叫自己的無限迴圈保護機制 |
-| block JSON 格式 | `{"decision": "block", "reason": "..."}` — reason 支援多行，用 awk 自動加編號 |
-| 問題清單 | 腳本用 bash array `ISSUES+=()` 累積問題，最後一次性格式化輸出 |
-| 乾淨通過 | 沒有問題時**不輸出任何東西**，直接 exit 0 即可 |
+| Step | 情境 | 結果 | 關鍵原因 |
+|------|------|------|---------|
+| 1 | 乾淨狀態 | 沉默 exit 0 | 無問題不打擾 |
+| 2 | 新建未追蹤檔（`??`） | **exit 0（盲點）** | `git diff` 不認 `??` |
+| 3 | 修改已追蹤檔 | block JSON + exit 0 | `git diff` 看見了 |
+| 4 | `stop_hook_active: true` | 沉默 exit 0 | 防護旗標提前離場 |
 
-## 職場類比
+**三種 block 格式對照（四課集齊）：**
 
-品質守衛 = **公司的 Pre-departure Checklist（出門前清單）**。
-每次你（Claude Code）要結束工作離開前，守衛都會問：
+| 課 | 事件 | 格式 | exit code |
+|----|------|------|-----------|
+| 第 4 課 | PreToolUse（Bash） | `exit 2`（無 JSON） | 2 |
+| 第 6 課 | PreToolUse（MCP） | `{hookSpecificOutput:{permissionDecision}}` | 0 |
+| 第 8 課 | Settings-change | `{decision, reason}` | 0 |
+| 第 9 課 | Stop | `{decision, reason}` | 0 |
 
-
-- 「有沒有東西沒存？」（未 commit 的變更）
-- 「有沒有沒處理完的待辦？」（TODO 標記）
-
-如果有問題 → 擋在門口（block），逼你先處理完再走。
-`stop_hook_active` = 守衛本身出門時不需要問自己。
+**產出物：** `quality-gate-demo.sh`
