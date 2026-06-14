@@ -1,181 +1,160 @@
 # 第 10 課演練記錄：prompt-hook-examples.json
 
-> 範例檔：`quality/prompt-hook-examples.json`（Prompt Hook — AI 評判 AI）
-
-## 課程目標
-
-學習 `type: "prompt"` Hook：
-不執行 shell 腳本，而是讓 **AI 模型當評判官**，
-動態判斷是否允許 Claude Code 繼續執行。
-
-## 工作目錄
-
-`code-中文/part2-hooks/quality/demo-prompt-hooks/`
+> 範例檔：`quality/prompt-hook-examples.json`
+> 事件：Stop / UserPromptSubmit / PostToolUse｜ 難度：⭐⭐⭐⭐
+> 主題：字串黑名單的終點 — 讓 AI 自己當裁判（`type: "prompt"` hook）
 
 ---
 
-## Step 1：建立 demo 目錄，解析三種 Prompt Hook 結構
+## 核心觀念
 
-### 指令
+前幾課（第 4、8 課）用 Bash 字串比對做決策，但 66% 繞過率、大小寫盲點全指向同一天花板：**規則有限，語意無限**。
+
+解法：`type: "prompt"` hook — 把整個 payload 丟給 Claude，讓 AI 讀懂意圖，回傳 `{"ok": true/false, "reason": "..."}` 讓 harness 決定放行或阻擋。
+
+```
+Claude Code 事件發生
+  → 把 payload JSON 填入 prompt 的 $ARGUMENTS 佔位符
+  → 送給 AI 模型（可指定 Haiku 省錢）
+  → AI 回傳 {"ok": ...}
+  → ok: false → 阻擋 + 顯示 reason
+```
+
+---
+
+## Step 1：讀懂三種 prompt hook 的結構
+
+**命令：**
 
 ```bash
-mkdir -p demo-prompt-hooks/
-cp quality/prompt-hook-examples.json demo-prompt-hooks/
-# 分析三種 hook 結構 → 寫入 hook-analysis.txt
+cat quality/prompt-hook-examples.json | python -m json.tool | head -40
 ```
 
-### 三種 Prompt Hook 一覽
+⚠️ **Windows cp950 陷阱**：直接 `python -c "open(...)"` 會報 UnicodeDecodeError，必須加 `encoding='utf-8'`（全課程通則）。
 
-| Hook 事件 | 模型 | 評判邏輯 |
-|-----------|------|---------|
-| Stop | 預設（Haiku） | stop_hook_active=true 放行；last_message 含錯誤 → 阻擋 |
-| UserPromptSubmit | 預設（Haiku） | 偵測 API key / 密碼 / 個人資料 → 阻擋 |
-| PostToolUse | claude-haiku-4-5-20251001 | .js/.ts 檔案掃描 XSS / SQL 注入 / 寫死憑證 |
+**目的：** 認識三個不同事件的 prompt hook 設計。
+**實際驗證：** ✅ 三個事件各有不同的 prompt，PostToolUse 多了 `"model"` 欄位：
 
-### 關鍵機制：$ARGUMENTS
-
-```
-Claude Code 觸發 Prompt Hook 時：
-1. 把事件資料序列化成 JSON 字串
-2. 把 $ARGUMENTS 替換成該 JSON 字串
-3. 把完整 prompt 送給 AI 模型
-4. AI 模型回傳 {"ok": ..., "reason": ...}
-5. ok: false → Claude Code 阻擋動作並顯示 reason
-```
-
-### 實際驗證結果 ✅
-
-`hook-analysis.txt` 已產生，包含三種 hook 結構的詳細說明。
+| 事件 | 任務 | 特色 |
+|------|------|------|
+| Stop | 工作是否真的完成 | 也處理 `stop_hook_active` 防迴圈 |
+| UserPromptSubmit | 掃描使用者訊息有沒有敏感資訊 | Claude 讀到之前就過濾 |
+| PostToolUse（Edit/Write）| 掃描剛寫的 .ts/.js 有無安全漏洞 | 指定 `claude-haiku-4-5-20251001` 省成本 |
 
 ---
 
-## Step 2：模擬 UserPromptSubmit — 敏感資訊過濾
+## Step 2：對比欄位 — PostToolUse 多了什麼
 
-### 指令
+**命令：**
 
-```bash
-# 構造測試輸入（模擬 $ARGUMENTS）
-# 用 claude -p 實際呼叫 AI 評判
-
-# 情境 A：安全的一般 prompt
-echo '{"prompt": "請幫我用 Python 寫一個讀取 CSV 檔案並計算平均值的腳本"}' \
-  | [hook prompt 包裝] \
-  | claude -p
-
-# 情境 B：含 API key 的敏感 prompt
-echo '{"prompt": "我的 API key 是 sk-ant-api03-abcd1234efgh5678，請用它呼叫..."}' \
-  | [hook prompt 包裝] \
-  | claude -p
+```python
+import json
+with open('quality/prompt-hook-examples.json', encoding='utf-8') as f:
+    data = json.load(f)
+for event, rules in data['hooks'].items():
+    for rule in rules:
+        h = rule['hooks'][0]
+        keys = list(h.keys())
+        print(f'{event}: {keys}')
 ```
 
-### 實際 AI 評判結果 ✅
+**實際驗證：** ✅
 
-**情境 A（安全 prompt）：**
-
-```json
-{"ok": true, "reason": "prompt 內容為一般程式設計請求（讀取 CSV 並計算平均值），不含 API 金鑰、密碼或個人資料。"}
+```
+Stop: ['type', 'prompt']
+UserPromptSubmit: ['type', 'prompt']
+PostToolUse: ['type', 'model', 'prompt']
 ```
 
-**情境 B（含 API key）：**
-
-```json
-{"ok": false, "reason": "prompt 欄位包含 Anthropic API 金鑰（sk-ant-api03-...），屬於敏感憑證，不應出現在請求內容中"}
-```
-
-Claude Code 收到 ok: false → 阻擋使用者 prompt，顯示 reason，保護 API key 不被傳入 AI context。
+**PostToolUse 多 `model` 的原因**：每次 Edit/Write 都觸發（高頻），指定 `claude-haiku-4-5-20251001`（最便宜模型）做安全掃描，成本控制。Stop 和 UserPromptSubmit 頻率低，不指定 = 繼承當前模型。
 
 ---
 
-## Step 3：模擬 PostToolUse — AI 掃描 .js 安全漏洞
+## Step 3：解析 $ARGUMENTS — 三個事件注入什麼
 
-### 指令
+**命令：**
 
-```bash
-# 情境 A：含 XSS 漏洞的 .js 寫入
-XSS_ARGS='{"tool_name":"Write","tool_input":{"file_path":"src/render.js","content":"document.getElementById(\"output\").innerHTML = comment;"}}'
-
-# 情境 B：安全的 .js（改用 textContent）
-SAFE_ARGS='{"tool_name":"Write","tool_input":{"file_path":"src/render.js","content":"document.getElementById(\"output\").textContent = comment;"}}'
-
-echo "$XSS_ARGS"  | [hook prompt 包裝] | claude -p
-echo "$SAFE_ARGS" | [hook prompt 包裝] | claude -p
+```python
+import json
+with open('quality/prompt-hook-examples.json', encoding='utf-8') as f:
+    data = json.load(f)
+for event, rules in data['hooks'].items():
+    for rule in rules:
+        p = rule['hooks'][0]['prompt']
+        idx = p.find('$ARGUMENTS')
+        before = p[max(0,idx-30):idx]
+        after = p[idx+10:idx+50]
+        print(f'{event}:')
+        print(f'  ...{before}[$ARGUMENTS]{after}...')
+        print()
 ```
 
-### 實際 AI 評判結果 ✅
+**實際驗證：** ✅
 
-**情境 A（innerHTML = comment，XSS 漏洞）：**
+| 事件 | $ARGUMENTS 是 | prompt 指示看哪個欄位 |
+|------|--------------|------------------|
+| Stop | session 結束 metadata | `.stop_hook_active`、`.last_assistant_message` |
+| UserPromptSubmit | 使用者剛送的訊息 | `.prompt`（敏感資訊掃描）|
+| PostToolUse | Edit/Write tool 呼叫結果 | `.tool_input.file_path`、`.tool_response` |
 
-```json
-{"ok": false, "reason": "XSS 漏洞：`innerHTML = comment` 直接將使用者輸入注入 DOM，攻擊者可注入任意 HTML/JS（如 `<img src=x onerror=alert(1)>`）。應改用 `textContent = comment` 或先對 comment 做 HTML 跳脫。"}
-```
-
-**情境 B（textContent，安全）：**
-
-```json
-{"ok": true, "reason": "使用 textContent 而非 innerHTML，已正確防禦 XSS。"}
-```
-
-AI 不只說「有問題」，還提供具體攻擊範例和修復建議，比靜態 lint 更聰明。
+每個事件的 payload 格式不同，prompt 必須對應寫正確的欄位路徑。
 
 ---
 
-## Step 4：模擬 Stop hook — AI 評判 session 結束品質
+## Step 4：設計練習 — 保護 production.env
 
-### 指令
+**題目：** 用 UserPromptSubmit prompt hook，讓 AI 判斷使用者是否要求讀取含 `production`/`prod` 關鍵字的環境變數檔案。
 
-```bash
-# 情境 A：stop_hook_active = true（煞車保護）
-BRAKE='{"stop_hook_active": true, "last_assistant_message": "工作完成！"}'
-
-# 情境 B：last_assistant_message 含錯誤
-ERROR='{"stop_hook_active": false, "last_assistant_message": "抱歉，執行失敗了。錯誤：FileNotFoundError: config.json 不存在，工作未完成。"}'
-
-echo "$BRAKE" | [hook prompt 包裝] | claude -p
-echo "$ERROR" | [hook prompt 包裝] | claude -p
-```
-
-### 實際 AI 評判結果 ✅
-
-**情境 A（stop_hook_active = true）：**
+**標準答案：**
 
 ```json
-{"ok": true, "reason": "stop_hook_active 為 true，且 last_assistant_message 顯示工作已完成"}
+{
+  "hooks": {
+    "UserPromptSubmit": [{
+      "hooks": [{
+        "type": "prompt",
+        "prompt": "請檢視以下使用者 prompt：\n$ARGUMENTS\n\n檢查 .prompt 欄位是否包含要求讀取、顯示、輸出、或存取含有 'production' 或 'prod' 關鍵字的環境變數檔案（如 production.env、prod.env 或相似命名）。若有此意圖，回傳 ok: false；其餘情況回傳 ok: true。\n\n{\"ok\": true/false, \"reason\": \"原因\"}"
+      }]
+    }]
+  }
+}
 ```
 
-**情境 B（last_assistant_message 含錯誤）：**
+**關鍵句**：「讀取、顯示、輸出、或存取」+ 說明什麼樣的檔案算 → AI 懂語意，一句話涵蓋所有說法。
 
-```json
-{"ok": false, "reason": "last_assistant_message 含有 FileNotFoundError 錯誤訊息，且明確顯示工作未完成"}
+**若改用 bash `grep -qF` 至少需要幾條 pattern？**
+
 ```
+cat production.env    show production.env    read production.env
+display production    print prod.env         output production
+cat prod.env.local    顯示 production.env    列出 prod 環境變數
+幫我看 production 設定  ...+ 大小寫 + 路徑前綴 + 多語言
+```
+
+→ **20+ 條**，仍有漏網之魚。
 
 ---
 
-## 本課重點總結
+## Part 2 Hooks 旅程終點：兩種防禦的分工
 
-| 觀念 | 說明 |
-|------|------|
-| Prompt Hook vs Command Hook | Command = 執行 shell 腳本；Prompt = 讓 AI 當評判官 |
-| $ARGUMENTS | Claude Code 把事件 JSON 填入，AI 看到完整事件資料 |
-| ok: false 效果 | Claude Code 阻擋動作，把 reason 顯示給使用者 |
-| 模型指定 | `"model": "claude-haiku-4-5-20251001"` 節省成本（PostToolUse 每次 Edit 都觸發！） |
-| 無模型指定 | 預設使用 Haiku 系列，不指定也省成本 |
-| 適用場景 | 規則複雜、需要自然語言理解（「這算敏感嗎？」「這算完成嗎？」）時 |
-
-## 與其他課的比較
-
-| | Command Hook（第 4 課：block-dangerous） | Prompt Hook（第 10 課） |
+| | Command Hook（第 4 課） | Prompt Hook（第 10 課）|
 |---|---|---|
-| 判斷方式 | 固定規則（黑名單字串比對） | AI 動態理解語意 |
-| 速度 | 毫秒 | 1-3 秒（網路 API 呼叫） |
-| 靈活性 | 低（78% 繞過率） | 高（理解意圖而非表面字串） |
+| 判斷方式 | 固定規則（字串比對） | AI 動態理解語意 |
+| 速度 | 毫秒 | 1-3 秒（API 呼叫）|
+| 靈活性 | 低（66% 繞過率）| 高（理解意圖）|
 | 成本 | 零 | 每次觸發扣 Haiku token |
-| 適用 | 明確禁止清單 | 模糊、需要判斷的情境 |
+| 適用 | 明確禁止清單 | 模糊、需要語意判斷 |
 
-## 職場類比
+**縱深防禦梯次（從第 4 課到第 10 課的完整答案）：**
 
-Prompt Hook = **公司的「老闆審批制度」**。
-一般 Hook 是「規則手冊」：查手冊有沒有這條 → 照辦。
-Prompt Hook 是「問老闆」：把情況說清楚，老闆用判斷力決定。
+```
+字串黑名單（快、免費）→ 擋明顯笨攻擊
+     +
+AI 語意裁判（慢一點、有成本）→ 處理語意繞過
+     +
+Permission Model 白名單（Part 5）→ 從根阻斷
+```
 
-老闆（AI）會說：「這個 API key 不該出現在這裡，擋下來。」
-規則手冊找不到 `sk-ant-api03-` 怎麼寫，老闆一眼就認出來了。
+三層不是取代關係，而是**互補的縱深防禦**。
+
+**產出物：** `prompt-hook-examples.json`（分析對象）
