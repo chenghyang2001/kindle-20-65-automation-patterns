@@ -1,116 +1,140 @@
 # 第 5 課演練記錄：反理由化防護
 
-> 對應文件：`docs/rationalization-prevention.md`
+> 對應文件：`docs/rationalization-prevention.md` + `05-demo-anti-rationalization/implementation-agent-safe.md`
+> 主題：AI 的 12 種迴避行為識別 + 在系統提示中嵌入防護條款
 
-## 課程目標
+---
 
-理解 AI 的 12 種迴避行為（理由化模式），
-學會在 agent 的 system prompt 中嵌入防護條款，
-讓 agent「不找藉口、直接執行」。
+## 核心觀念
 
-## 工作目錄
-
-`code-中文/part3-agents/demo-anti-rationalization/`
+理由化行為 = AI 遇困難任務時找藉口停工，但技術上完全可行。
+防護不是「什麼都照做」，是阻斷「可行但找藉口不做」的那些行為。安全限制（tools 白名單、permissionMode）依然有效。
 
 ---
 
 ## Step 1：認識 12 種理由化模式
 
-### 指令
+**命令：**
 
 ```bash
-cat ../docs/rationalization-prevention.md
+cat code-中文/part3-agents/docs/rationalization-prevention.md
 ```
 
-### 填入「最常見的 3 種」（演練時填入）
+**實際驗證：** ✅ 文件列出 12 種模式 + 對策 + AGENT.md 整合範本：
 
-1. ___
-2. ___
-3. ___
+| 理由化說法 | 真正的意思 | 應採取的行動 |
+|-----------|-----------|------------|
+| 檔案太大 | 懶得讀 | 用 Read 只讀需要的範圍 |
+| 測試太複雜 | 不想修測試 | 先修測試，再實作 |
+| 與現有程式碼不相容 | 沒把握改 | 先改，再另行回報相容性問題 |
+| 需要超出範圍的改動 | 想逃避額外工作 | 執行指示的範圍，再列出額外工作 |
+| 擔心有副作用 | 不想改 | 最小化改動並把副作用文件化 |
+| 文件不足 | 不確定、不想推進 | 用現有資訊做判斷並繼續進行 |
+| 有更好的做法 | 想改變指示 | 照指示執行，最後再建議替代方案 |
+| 會花很多時間 | 想中途放棄 | 逐步推進並回報已完成的部分 |
+| 發生錯誤了 | 想合理化停工 | 分析錯誤、嘗試解法，再回報 |
+| 格式不清楚 | 想拖延開工 | 用最合理的解讀推進，並說明假設 |
+| 品質可能下降 | 不想照指示做 | 照指示執行，最後回報品質疑慮 |
+| 應該先取得核准 | 想逃避責任 | 在工具白名單內直接執行，必要時再確認 |
+
+**防護放在哪裡**：系統提示（frontmatter 之後的正文），不是 description。description 管「何時呼叫」，系統提示管「呼叫後怎麼行動」。
 
 ---
 
-## Step 2：比較有防護 vs 無防護的 agent
+## Step 2：比較簡版 vs 實際版 — 三個差異點
 
-### 無防護版（一般 agent）
+**命令：**
+
+```bash
+cat code-中文/part3-agents/docs/rationalization-prevention.md   # AGENT.md 整合範本（簡版）
+cat code-中文/part3-agents/05-demo-anti-rationalization/implementation-agent-safe.md  # 實際版
+```
+
+**實際驗證：** ✅
+
+| 項目 | 簡版（docs 範本）| 實際版（implementation-agent-safe.md）|
+|------|-----------------|--------------------------------------|
+| description | 「實作任務時主動使用」（一行）| 「程式碼實作、功能開發、bug 修復時主動使用。遇到困難不找藉口，直接執行並回報阻礙。」|
+| model | 無（繼承）| `model: sonnet`（明確指定）|
+| 系統提示結構 | 負面規則（不能停）| 正面格式：「無法完成時」獨立章節，三件事回報格式 |
+
+**差異背後的設計意圖：**
+
+- description 加入「遇困難直接執行」= 把行為期望提前到**路由層**，Claude 呼叫前就帶著期望
+- model 明確 sonnet = 抗全域覆蓋（`CLAUDE_CODE_SUBAGENT_MODEL=haiku` 不會意外降品質）
+- 三件事格式（步驟/阻礙/下一步）= 格式化停工報告讓使用者**接手成本最低**
+
+---
+
+## Step 3：合理停工 vs 理由化行為的判斷標準
+
+**三個情境判斷：**
+
+| 情境 | 判定 | 原因 |
+|------|------|------|
+| 「這個 DELETE 沒有 WHERE，會刪掉所有資料，我拒絕執行」| ✅ 合理停工 | 不可逆毀滅性操作，超出安全限制前提 |
+| 「這個函式有 200 行，重構太複雜，建議先討論再動手」| ❌ 理由化行為 | 技術上可行，「太複雜」= 沒把握改的藉口 |
+| 「我沒有 Write 工具，無法建立這個檔案」| ✅ 合理停工 | 工具白名單硬限制，技術上不可行 |
+
+**判斷標準（一條）：**
+
+```
+技術上可行 + 只是找藉口 → 理由化行為（必須執行）
+技術上不可行（工具限制）OR 不可逆毀滅性操作 → 合理停工（必須回報三件事）
+```
+
+---
+
+## Step 4：針對性防護設計 — db-migration-reviewer
+
+**任務**：為第 2 課的 `db-migration-reviewer` 加入防理由化系統提示，專門對抗「檔案太大」的迴避場景。
+
+**設計答案：**
 
 ```markdown
 ---
-name: implementation-agent
-description: 實作專家。實作任務時主動使用。
-tools: Read, Write, Edit, Bash, Grep, Glob
+name: db-migration-reviewer
+description: >
+  資料庫遷移腳本審查專家。
+  新增或修改 migrations/ 目錄下的 .sql 檔時主動使用。
+tools: Read, Grep, Glob
+model: sonnet
+permissionMode: plan
 ---
 
-請完成被交付的任務。
-```
+## 審查目標
 
-### 有防護版（加入反理由化條款）
-
-```markdown
----
-name: implementation-agent-safe
-description: 實作專家。實作任務時主動使用。
-tools: Read, Write, Edit, Bash, Grep, Glob
----
+找出 migrations/*.sql 中的潛在破壞性操作：
+- 無 WHERE 條件的 DELETE / UPDATE
+- DROP TABLE / DROP COLUMN
+- 無法回滾的資料結構變更
 
 ## 行為原則
 
-完成被交付的任務。以下是理由化行為，直接跳過：
+檔案多大都要完整讀完，不可只分析部分：
+- 「檔案太大」→ 用 Read 分段讀取（offset + limit），分批完成，不跳過任何行
+- 「語法看不懂」→ 用最保守的解讀（視為潛在危險），標記後繼續
 
-- 「做不到」→ 轉換成「要怎麼做到？」
-- 「可能有危險」→ 執行改動並回報疑慮
-- 「超出範圍」→ 執行指示範圍，再列出額外工作
-- 「不清楚」→ 用最合理的解讀推進，說明假設
-- 「發生錯誤了」→ 分析錯誤、嘗試解法，再回報
+## 無法完成時
 
-無法完成任務時：**回報已嘗試的步驟和具體阻礙**，
-不可僅說「很難做到」或「需要更多資訊」。
+回報以下三件事，不可只說「無法審查」：
+
+1. 已審查範圍：哪幾行到哪幾行
+2. 具體阻礙：工具錯誤訊息 or 哪段 SQL 無法解讀
+3. 建議下一步：需要人工確認的具體位置
 ```
+
+**關鍵設計**：不是把 12 條全塞進去，而是只防「這個 agent 最容易逃避的那條」+ 給出具體工具用法（`Read offset + limit`），讓 agent 沒有「做不到」的藉口。
 
 ---
 
-## Step 3：建立 implementation-agent-safe.md
+## 第 5 課四 Step 對照
 
-### 建立指令
+| Step | 主題 | 關鍵收穫 |
+|------|------|---------|
+| 1 | 認識 12 種模式 | 防護放在系統提示，不是 description |
+| 2 | 比較兩個版本 | description 也可帶行為期望；三件事格式降低接手成本 |
+| 3 | 合理停工判斷 | 工具限制 + 毀滅性操作 = 合理；「太難」= 理由化 |
+| 4 | 針對性設計 | 只防最可能的那條 + 給具體工具路徑 > 全面防護 |
 
-```bash
-cat > demo-anti-rationalization/implementation-agent-safe.md << 'EOF'
-（填入有防護版內容）
-EOF
-```
-
-### 實際結果
-
-（演練時填入）
-
----
-
-## Step 4：模擬測試（用 claude -p 測試迴避行為）
-
-### 場景：給 agent 一個「看起來有點難」的任務
-
-```bash
-echo "請修改 nonexistent-file.py 加入 logging 功能" \
-  | claude -p --system "$(cat implementation-agent-safe.md | tail -n +7)"
-```
-
-### 預期差異
-
-| 無防護 agent | 有防護 agent |
-|-------------|-------------|
-| 「檔案不存在，無法繼續」 | 「嘗試：1) 用 Glob 尋找... 2) 確認路徑... 回報：找不到 nonexistent-file.py，可能路徑是...」 |
-
-### 實際結果
-
-（演練時填入）
-
----
-
-## 本課重點
-
-| 概念 | 說明 |
-|------|------|
-| 理由化行為 | AI 遇困難時找藉口停工，不是真的做不到 |
-| 防護目的 | 不是要 AI「什麼都照做」，是阻斷「技術上可行但找藉口不做」 |
-| 安全限制仍有效 | tools 白名單 + permissionMode 依然守住邊界 |
-| 嵌入位置 | agent 的 system prompt（frontmatter 之後的內文） |
+**產出物：** `rationalization-prevention.md`（分析對象）、`implementation-agent-safe.md`（實際版對比）、`db-migration-reviewer` 系統提示（設計練習）
