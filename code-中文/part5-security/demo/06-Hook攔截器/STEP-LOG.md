@@ -7,9 +7,10 @@
 
 ## 課程目標
 
-理解 Pre-Tool-Use Hook 如何在工具執行前插入自定義邏輯，
-學會用 `exit 2` + JSON 回應機制攔截危險操作並給 AI 明確的修正方向，
-掌握「機密掃描」和「環境感知」兩種核心 Hook 模式。
+理解 Pre-Tool-Use Hook 如何在工具執行前攔截並決定放行或阻斷，
+學會 exit 0 / exit 1 / exit 2 三種 exit code 的差異，
+掌握「內容掃描型」和「環境感知型」兩種 Hook 模式，
+體會 exit 2 的「教育型防護」如何讓 AI 自行修正而非死擋。
 
 ## 工作目錄
 
@@ -19,44 +20,43 @@
 
 ## Step 1：閱讀 secret-scanner.sh，理解機密掃描邏輯
 
-### 閱讀任務
+### Hook 觸發時機
 
-打開 `hooks/secret-scanner.sh`，回答：
+`PreToolUse`——在 Claude 要執行任何工具**之前**觸發，Hook 可以決定是否讓工具真正執行。
 
-1. 這個 Hook 在什麼事件觸發？（看 Hook 類型）
+### 監控工具
 
-   答：
+`Write`（建立/覆寫整個檔案）和 `Edit`（修改檔案特定區段）——兩個會把內容寫進檔案的工具。
 
-2. 它監控哪兩個工具的呼叫？
+### 七種機密 pattern
 
-   答：
+| 機密類型 | 正規表達式 pattern |
+|---------|----------------|
+| AWS Access Key | `AKIA[0-9A-Z]{16}` |
+| GitHub PAT / App Token | `gh[ps]_[A-Za-z0-9]{36}` |
+| Anthropic API Key | `sk-ant-[A-Za-z0-9\-]{95}` |
+| OpenAI API Key | `sk-[A-Za-z0-9]{48}` |
+| Google API Key | `AIza[0-9A-Za-z\-_]{35}` |
+| Stripe Secret/Public Key | `(sk\|pk)_(test\|live)_[A-Za-z0-9]{24}` |
+| RSA/EC/DSA 私鑰 | `-----BEGIN (RSA\|EC\|DSA) PRIVATE KEY-----` |
 
-3. 填入它掃描的 7 種機密 pattern：
+### 偵測到機密時的回應 JSON
 
-   | 機密類型 | 正規表達式 pattern |
-   |---------|----------------|
-   | AWS Access Key | `AKIA[0-9A-Z]{16}` |
-   | GitHub Personal Access Token | |
-   | GitHub App / OAuth Token | |
-   | Anthropic API Key | |
-   | OpenAI API Key | |
-   | Google API Key | |
-   | Stripe Secret Key | |
-   | RSA Private Key | |
+```json
+{"decision":"block","reason":"偵測到機密資訊：${NAMES[$i]}"}
+```
 
-4. 當 Hook 偵測到機密時，它回傳什麼格式的回應？
+### exit code 含義
 
-   ```json
-   （抄下 secret-scanner.sh 的回應 JSON）
-   ```
-
-5. `exit 2` 的含義是什麼？（提示：exit 0 = 允許，exit 1 = ？，exit 2 = ？）
-
-   答：
+| exit code | 含義 |
+|-----------|------|
+| `exit 0` | 允許工具繼續執行 |
+| `exit 1` | 硬性阻斷，把 stderr 當錯誤訊息丟給**使用者**看 |
+| `exit 2` | 帶反饋的阻斷，把 stdout 的 JSON 回傳給 **AI**，AI 讀到 reason 後可自行修正 |
 
 ### 實際結果
 
-（演練時填入）
+讀取 secret-scanner.sh 確認：PreToolUse 觸發、監控 Write + Edit 兩個工具、7 種機密 pattern（AWS/GitHub/Anthropic/OpenAI/Google/Stripe/私鑰）、exit 2 帶 JSON reason 反饋。
 
 ---
 
@@ -80,149 +80,129 @@ exit 2 的 JSON 格式：
 }
 ```
 
-### 思考問題
+### exit 2 vs exit 1 的差異
 
-1. secret-scanner.sh 用的是 `exit 2`，而不是 `exit 1`。
-   從 AI 的角度，這兩種有什麼不同的體驗？
+| | exit 1 | exit 2 |
+|--|--------|--------|
+| 誰收到訊息 | 使用者（stderr 顯示在終端機） | AI（JSON 回傳到 AI context） |
+| AI 知道原因嗎 | 不知道（AI 只知道「失敗了」） | 知道（reason 欄位說明原因） |
+| AI 能自行修正嗎 | 不能（不知道要改什麼） | 能（知道是哪種機密被偵測到） |
+| 使用體驗 | 錯誤訊息出現在終端機，AI 停住 | AI 自動嘗試移除機密後重試 |
 
-   答：
+### AI 讀到「偵測到機密資訊：ANTHROPIC」後的三步驟
 
-2. reason 欄位裡寫的是「偵測到機密資訊：NAME」。
-   AI 讀到這個訊息後，下一步最可能做什麼？
+1. **從內容移除 API Key**：把硬編碼的 `sk-ant-xxx` 改成環境變數引用 `os.environ["ANTHROPIC_API_KEY"]`
+2. **重新嘗試 Write**：修正後的內容再次呼叫 Write
+3. **告知使用者**：說明「我偵測到 API Key 被硬編碼，已改為環境變數讀取」
 
-   答：
+exit 2 讓 Hook 從「死擋」升級為「教育型防護」——攔截 + 給方向 + AI 自修正。
 
-3. 如果改成 `exit 1`，AI 能自行修正嗎？
+### exit 1 時 AI 能自行修正嗎
 
-   答：
+**不能**。exit 1 只把 stderr 丟給使用者，AI 的 context 裡沒有收到任何資訊，AI 只知道「Write 失敗了」，但不知道**為什麼**失敗。AI 只能停下來等使用者解釋，或嘗試完全不同的方向（可能猜錯）。
 
-4. 為什麼 `exit 2` 比「在 CLAUDE.md 裡寫不要把 API Key 寫進檔案」更可靠？
+### exit 2 比 CLAUDE.md 說明更可靠的原因
 
-   答：
+| | CLAUDE.md 說「不要寫 API Key」 | exit 2 Hook |
+|--|-------------------------------|------------|
+| 觸發時機 | 讀取 CLAUDE.md 時（session 開頭） | 每次 Write/Edit 呼叫時 |
+| AI 能忘記嗎 | 能（長對話後 CLAUDE.md 內容可能被壓縮出 context） | 不能（每次呼叫都重新執行） |
+| 能偵測新格式嗎 | 不能（只靠 AI 的「記憶」） | 能（regex 可以更新） |
+| 能抓到意外洩漏嗎 | 不能（AI 不知道 context 裡有 Key） | 能（掃描實際內容） |
 
 ### 實際結果
 
-（演練時填入）
+理解 exit 2 三段反饋：攔截 → reason JSON 給 AI → AI 自修正重試。exit 1 是死擋，exit 2 是教育型防護，CLAUDE.md 語言層約束無法取代系統層 Hook。
 
 ---
 
 ## Step 3：閱讀 dev-server-blocker.sh，理解環境感知攔截
 
-### 閱讀任務
+### 攔截的操作類型
 
-打開 `hooks/dev-server-blocker.sh`，回答：
+「**在非互動終端環境下啟動長期執行的開發伺服器**」。攔截的是「會佔據終端機、無法背景化的前景程序」這類行為，而非特定工具。
 
-1. 這個 Hook 攔截的是哪類操作？（不是哪個工具，而是哪類「行為」）
+### 偵測的環境變數
 
-   答：
+`$TMUX`——檢查是否在 tmux session 內。`$TMUX` 有值 = 在 tmux 分割視窗中；`$TMUX` 為空 = 在單一終端機前景。
 
-2. 它偵測的環境變數是什麼？這個變數代表什麼環境？
+### 被攔截指令的原因
 
-   答：
+| 被攔截的指令 | 為什麼在非 TMUX 環境下危險？ |
+|------------|--------------------------|
+| `npm run dev` | 佔據終端機前景，Claude 無法繼續執行其他指令，session 卡住 |
+| `yarn dev` / `pnpm dev` | 同上，AI 和使用者都失去對終端機的控制權 |
+| `flask run` | 啟動 Flask 開發伺服器，持續輸出 log，終端機被鎖定 |
+| `python manage.py runserver` | Django 開發伺服器，同樣佔用前景 |
+| `next dev` / `vite` | 前端熱更新伺服器，持續監聽，Claude 無法繼續操作 |
 
-3. 被攔截的指令有哪些？填入表格：
+### reason 建議的解法
 
-   | 被攔截的指令 | 為什麼在非 TMUX 環境下危險？ |
-   |------------|--------------------------|
-   | `npm run dev` | |
-   | `yarn dev` | |
-   | `flask run` | |
-   | `uvicorn *` | |
-   | `python -m http.server` | |
+> 「開發伺服器只允許在 tmux session 內啟動。」
 
-4. 它回傳的 reason 裡建議使用者怎麼做？
-
-   答：
+言下之意：先 `tmux new -s dev` 或 `tmux split-window`，在 tmux 分割的視窗裡啟動伺服器，原視窗繼續讓 Claude 工作。
 
 ### 實際結果
 
-（演練時填入）
+理解環境感知型 Hook：讀 `$TMUX` 判斷執行環境，在非 tmux 環境阻斷所有前景開發伺服器指令，reason 明確告訴 AI 正確的解法（先開 tmux）。
 
 ---
 
 ## Step 4：設計你自己的 Pre-Tool-Use Hook
 
-### 情境
-
-你想設計一個 Hook，防止 AI 在生產環境的 `.env.production` 裡寫入任何內容。
-邏輯：如果 AI 要呼叫 Write 或 Edit，而且目標路徑包含 `.env.production`，就攔截。
-
-填入 shell 腳本的核心邏輯：
+### 完整 Hook 腳本（保護 .env.production）
 
 ```bash
-#!/bin/bash
-
-# 從標準輸入讀取 Hook 事件（JSON 格式）
-INPUT=$(cat)
-
-# 取得工具名稱
-TOOL_NAME=$(echo "$INPUT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('tool_name',''))")
-
-# 取得目標路徑（Write 工具的 file_path 欄位）
-FILE_PATH=$(echo "$INPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('tool_input',{}).get('file_path',''))")
-
-# 判斷邏輯：如果工具是 Write 或 Edit，且路徑含 .env.production
 if [[ "$TOOL_NAME" == "Write" || "$TOOL_NAME" == "Edit" ]]; then
   if [[ "$FILE_PATH" == *".env.production"* ]]; then
-    echo '（填入你的 JSON 回應）'
-    exit ___  # 填入正確的 exit code
+    echo '{"decision":"block","reason":"禁止寫入 .env.production：這是生產環境設定，只能透過 CI/CD 系統更新，不可在本機直接修改。"}'
+    exit 2
   fi
 fi
-
-exit 0
 ```
 
-完成後，回答：
+### reason 欄位涵蓋三件事
 
-1. 你的 reason 欄位寫什麼？要讓 AI 知道哪些資訊？
+1. **為什麼被擋**：這是生產環境設定
+2. **應該怎麼做**：透過 CI/CD 系統更新
+3. **不應該做什麼**：不可本機直接修改
 
-   答：
+### Hook vs Deny 規則的本質差別
 
-2. 這個 Hook 和 Deny 規則（`Edit(.env.production)`）有什麼本質差別？
-
-   | 比較 | Deny 規則 | Pre-Tool-Use Hook |
-   |------|---------|-----------------|
-   | 設定位置 | settings.json | hooks/ 目錄下的腳本 |
-   | 判斷邏輯複雜度 | 只能做 pattern match | |
-   | 能讀取環境資訊嗎 | 不能 | |
-   | 能給 AI 詳細說明嗎 | 不能（只會說「被拒絕」） | |
+| 比較 | Deny 規則 | Pre-Tool-Use Hook |
+|------|---------|-----------------|
+| 設定位置 | settings.json | hooks/ 目錄下的腳本 |
+| 判斷邏輯複雜度 | 只能做 glob pattern match（靜態） | 可以執行任意 shell 邏輯（動態） |
+| 能讀取環境資訊嗎 | 不能 | 能（`$TMUX`、`$NODE_ENV`、`$CI` 等） |
+| 能給 AI 詳細說明嗎 | 不能（只說「Permission denied」） | 能（exit 2 + reason JSON = AI 知道原因和修正方向） |
+| 適用場景 | 知道要擋什麼（靜態規則） | 知道在什麼情況才擋（動態邏輯） |
 
 ### 實際結果
 
-（演練時填入）
+設計完整 Hook：Write/Edit 攔截 + 路徑比對 `.env.production` + exit 2 帶 reason。理解 Hook vs Deny 的選擇原則：靜態規則 → Deny，動態邏輯（環境感知/內容掃描）→ Hook。
 
 ---
 
 ## 本課重點
 
 ```
-Pre-Tool-Use Hook 的執行時機：
-  工具被呼叫 → Hook 先執行 → 決定是否放行 → 工具才真正執行
+Pre-Tool-Use Hook 執行時機：
+  工具被呼叫 → Hook 先執行 → 決定放行 → 工具才真正執行
 
-  和 Deny 規則的差別：
-  Deny 規則 = 靜態 pattern match（規則寫死）
-  Hook     = 動態腳本（可以讀環境變數、查檔案內容、呼叫外部 API）
+三種 exit code：
+  exit 0 → 放行
+  exit 1 → 硬擋（使用者看到 stderr）
+  exit 2 → 智慧擋（AI 看到 reason JSON，可自行修正）
 
 exit 2 的反饋迴圈：
-  Hook 攔截 → 給 AI reason → AI 知道「為什麼被擋」
-  → AI 自行修正（移除機密 / 換環境）→ 重試
-  這讓 Hook 從「死擋」升級為「教育型防護」
+  Hook 攔截 → reason 給 AI → AI 修正 → 重試
+  從「死擋」升級為「教育型防護」
 
 兩種核心 Hook 模式：
+  內容掃描（secret-scanner）：掃描寫入內容的 pattern
+  環境感知（dev-server-blocker）：讀環境變數決定是否允許
 
-  模式 1：內容掃描（secret-scanner）
-    「檢查 AI 要寫入的內容有沒有問題」
-    觸發：Write / Edit
-    邏輯：從 tool_input.content 掃描 pattern
-    適用：機密偵測、PII 偵測、硬編碼路徑偵測
-
-  模式 2：環境感知（dev-server-blocker）
-    「根據當前環境決定是否允許某操作」
-    觸發：Bash
-    邏輯：讀環境變數（$TMUX、$CI、$NODE_ENV）決定
-    適用：防止 CI 環境啟動開發伺服器、防止生產環境執行危險指令
-
-Hook 是 Deny 規則的「升階版」：
-  Deny：我知道要擋什麼（靜態）
-  Hook：我知道在什麼情況下才擋（動態）
+Hook vs Deny 的選擇：
+  靜態規則（知道要擋什麼）→ Deny
+  動態邏輯（知道在什麼情況才擋）→ Hook
 ```
