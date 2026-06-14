@@ -19,87 +19,65 @@ PR 提交 → AI 審查留言 → 測試失敗 → AI 自動修復 → 開 PR �
 
 ## Step 1：閱讀兩個 Workflow，拼出完整流程圖
 
-### 閱讀任務
-
-打開 `github-actions/pr-review.yml` 和 `github-actions/auto-fix.yml`，填入流程：
-
-#### pr-review.yml 的觸發條件
+### pr-review.yml 的觸發條件
 
 | 欄位 | 值 |
 |------|-----|
-| 觸發事件 | |
-| 觸發類型 | |
-| 需要的 Permission | |
-| 呼叫的腳本 | |
+| 觸發事件 | `pull_request` |
+| 觸發類型 | `opened`、`synchronize`（開 PR 和每次新 push 都觸發） |
+| 需要的 Permission | `pull-requests: write`（才能留 PR 留言） |
+| 呼叫的腳本 | `.github/scripts/review.sh ${{ github.event.pull_request.number }}` |
 
-#### auto-fix.yml 的觸發條件
+### auto-fix.yml 的觸發條件
 
 | 欄位 | 值 |
 |------|-----|
-| 觸發事件（監聽哪個 Workflow） | |
-| 觸發條件 | |
-| 失敗輸出存在哪裡 | |
-| 呼叫的腳本 | |
+| 觸發事件（監聽哪個 Workflow） | `workflow_run`，監聽 **"Run Tests"** |
+| 觸發條件 | `github.event.workflow_run.conclusion == 'failure'`（只在測試失敗時執行） |
+| 失敗輸出存在哪裡 | `test-output.txt`（`npm test 2>&1 \| tee test-output.txt` 產生） |
+| 呼叫的腳本 | `.github/scripts/auto-fix.sh` |
 
-### 填入完整流程圖
+### 完整流程圖
 
 ```
 開發者 push PR
   ↓
 [pr-review.yml 觸發]
-AI 讀 diff → _____________ → 留 PR 留言
+AI 讀 diff → 分析程式碼問題（安全/品質/規範） → 留 PR 留言
   ↓
-開發者合併 PR → 主線測試執行
+開發者合併 PR → 主線測試執行（"Run Tests" Workflow）
   ↓（若測試失敗）
 [auto-fix.yml 觸發]
-AI 讀 test-output.txt → _____________ → _____________
+AI 讀 test-output.txt → 分析根本原因 + 嘗試修復 + 執行測試驗證 → 開 PR（不直接 push main）
   ↓
-等待 _____________ 審核
+等待 人類 reviewer 審核
 ```
 
 ### 實際結果
 
-（演練時填入）
+讀取 pr-review.yml 和 auto-fix.yml 確認：兩個 Workflow 串成完整 PR → 合併 → 修復 → 人工審核的閉環 Pipeline。
 
 ---
 
 ## Step 2：理解「Verify → Fix → Verify」迴圈
 
-### 概念說明
-
-auto-fix.yml 的安全設計原則：
-
-```
-測試失敗（CI 偵測）
-  ↓
-AI 讀取失敗輸出 → 分析根本原因
-  ↓
-AI 嘗試修復（有 Write 權限，但只在 feature branch）
-  ↓
-AI 執行測試驗證修復是否有效
-  ↓（修復成功）
-AI 開 PR（不直接 push main！）
-  ↓
-人類審核 → 決定合併
-```
-
 ### 思考問題
 
 1. 為什麼 auto-fix.yml 的最後一步是「開 PR」而不是「直接 push main」？
 
-   答：
+   答：AI 可能修錯（測試通過不代表邏輯正確）；main 直接修改影響所有人且難回滾；開 PR 保留人類最後把關點——合併決策永遠屬於人類。
 
 2. 如果 AI 修復失敗（測試還是過不了），流程應該怎麼處理？
 
-   答：
+   答：設最大重試次數（如 3 次），超過後：(1) 開失敗狀態的 PR 說明需人工介入，或 (2) 直接發通知（Slack/Telegram）讓人類接手。不設上限會造成無限重試迴圈，燒光 API 額度。
 
-3. commit 訊息裡加入 `[skip actions]` 標籤的目的是什麼？（防止什麼？）
+3. commit 訊息裡加入 `[skip actions]` 標籤的目的是什麼？
 
-   答：
+   答：防止無限觸發迴圈。AI commit → 觸發 "Run Tests" → 若失敗 → 觸發 auto-fix → AI 再 commit → 無限循環。加 `[skip actions]` 後 GitHub Actions 跳過觸發，打破迴圈。
 
 ### 實際結果
 
-（演練時填入）
+理解三鐵律：AI 不直接 push main、`[skip actions]` 防無限迴圈、最小化修改範圍。
 
 ---
 
@@ -109,21 +87,19 @@ AI 開 PR（不直接 push main！）
 
 | Pipeline 步驟 | 使用的技術 | 對應第幾課 |
 |--------------|-----------|----------|
-| `claude -p` 背景執行 | | 第 1 課 |
-| `--output-format json` + `jq` | | 第 2 課 |
-| Conventional Commits 自動 commit | | |
-| `--resume $SESSION_ID` | | |
-| `--permission-mode plan` | | |
-| 多個 `&` 平行審查 | | |
+| `claude -p` 背景執行 | CI 不掛起、exit code 判斷 | 第 1 課 |
+| `--output-format json` + `jq` | 擷取 `.result` / `.session_id` | 第 2 課 |
+| Conventional Commits 自動 commit | `fix:` 前綴 + `[skip actions]` | 第 3 課 |
+| `--resume $SESSION_ID` | 分析 → 修復 → 驗證三步共享脈絡 | 第 4 課 |
+| `--permission-mode plan` | PR 審查唯讀，不改生產程式碼 | 第 5 課 |
+| 多個 `&` 平行審查 | 安全/品質/規範同時跑 | 第 6 課 |
 
-### 填入 7 個步驟的完整 Pipeline
-
-設計一個從「PR 開啟」到「main 合併」的完整七步驟流程，每步標注用哪個引數：
+### 完整七步驟 Pipeline
 
 ```
 步驟 1：PR 開啟時
-  → claude -p "審查 diff，找出..."
-  → 引數：_______________________________
+  → claude -p "審查 diff，找出安全/品質/規範問題..."
+  → 引數：--permission-mode plan --allowedTools "Bash(gh pr review *)"
   → 輸出：留 PR 留言
 
 步驟 2：PR 合併後，跑測試
@@ -132,19 +108,19 @@ AI 開 PR（不直接 push main！）
 
 步驟 3：分析失敗原因
   → claude -p "讀 test-output.txt，分析根本原因..."
-  → 引數：_______________________________
+  → 引數：--permission-mode plan --output-format json
   → 輸出：SESSION_ID 存起來
 
 步驟 4：根據分析結果修復
-  → 引數：--resume $SESSION_ID _______________________________
+  → 引數：--resume $SESSION_ID --allowedTools "Read,Edit,Bash(pytest *)"
   → 輸出：修復後的程式碼
 
 步驟 5：驗證修復是否有效
-  → 引數：--resume $SESSION_ID _______________________________
+  → 引數：--resume $SESSION_ID --allowedTools "Bash(pytest *)" --permission-mode plan
   → 輸出：pass / fail
 
 步驟 6：Commit 修復內容
-  → 引數：_______________________________
+  → 引數：--allowedTools "Bash(git add *),Bash(git commit *)" --max-turns 2
   → commit message 用 fix: 前綴 + [skip actions] 避免無限循環
 
 步驟 7：開 PR 等待人工審核
@@ -154,7 +130,7 @@ AI 開 PR（不直接 push main！）
 
 ### 實際結果
 
-（演練時填入）
+六課技術在七步驟 Pipeline 中各司其職，形成完整閉環。
 
 ---
 
@@ -165,28 +141,22 @@ AI 開 PR（不直接 push main！）
 如果你現在管理一個真實的 GitHub repository，要導入 pr-review.yml，
 你需要在 GitHub 的哪個地方設定 `ANTHROPIC_API_KEY`？
 
-答：
+答：GitHub repository → **Settings → Secrets and variables → Actions → New repository secret**，名稱設為 `ANTHROPIC_API_KEY`。Workflow 用 `${{ secrets.ANTHROPIC_API_KEY }}` 讀取，永遠不出現在程式碼或 log 裡。
 
 ### 安全考量 Checklist
 
-在真實環境導入這套 Pipeline 之前，確認以下事項：
-
-```
-- [ ] ANTHROPIC_API_KEY 存在 GitHub Secrets，不在程式碼裡
-- [ ] auto-fix 的 PR 需要至少一位人類 reviewer 批准才能合併
-- [ ] Workflow 只對 feature branch 有寫入權限，main 分支保護開啟
-- [ ] auto-fix 的 commit 訊息加入 [skip actions] 避免觸發無限迴圈
-- [ ] 設定每月 API 費用上限（Anthropic console）
-- [ ] PR review 的留言格式在 prompt 裡明確規定（必填：嚴重程度）
-```
-
-逐一確認並回答：哪幾項在你現有的設定中已經具備？
-
-答：
+| 項目 | 狀態 | 說明 |
+|------|------|------|
+| `ANTHROPIC_API_KEY` 存在 GitHub Secrets | ✅ 已具備 | yml 裡用 `${{ secrets.ANTHROPIC_API_KEY }}`，不硬編碼 |
+| auto-fix 的 PR 需人類 reviewer 批准 | ⚠️ 需手動設定 | 要在 branch protection rule 開 "Require approvals" |
+| Workflow 只對 feature branch 有寫入權限 | ⚠️ 需手動設定 | 預設 GITHUB_TOKEN 有 main 寫入權；要設 branch protection |
+| auto-fix commit 加 `[skip actions]` | ✅ 已設計 | 七步驟流程已包含此設計 |
+| 設定每月 API 費用上限 | ⚠️ 需手動設定 | 到 Anthropic console → Billing → Usage limits 設定 |
+| PR review 留言格式在 prompt 明確規定 | ✅ 已設計 | review.sh 的 prompt 應含格式規範（嚴重程度必填） |
 
 ### 實際結果
 
-（演練時填入）
+6 項 Checklist：3 項已具備，3 項需在 GitHub 設定後才能完整保護生產環境。
 
 ---
 
@@ -194,20 +164,18 @@ AI 開 PR（不直接 push main！）
 
 ### 回顧
 
-把第 1 到第 6 課學的技術統一用一句話描述它在 Pipeline 裡解決的問題：
-
 | 課程 | 技術 | 在 Pipeline 裡解決什麼問題 |
 |------|------|--------------------------|
-| 第 1 課 | `claude -p` 無頭模式 | |
-| 第 2 課 | `--output-format json` | |
-| 第 3 課 | 自動 commit 訊息 | |
-| 第 4 課 | `--resume $SESSION_ID` | |
-| 第 5 課 | `--permission-mode plan` | |
-| 第 6 課 | 平行 `&` + `wait` | |
+| 第 1 課 | `claude -p` 無頭模式 | 讓 CI 能在背景呼叫 AI，不掛起 pipeline，用 exit code 判斷成敗 |
+| 第 2 課 | `--output-format json` | 從 AI 輸出擷取 `session_id`，讓跨步驟接力成為可能 |
+| 第 3 課 | 自動 commit 訊息 | AI 修復後產出符合 Conventional Commits 的 `fix:` commit，加 `[skip actions]` 防無限迴圈 |
+| 第 4 課 | `--resume $SESSION_ID` | 分析 → 修復 → 驗證三步共享同一個 context，省 token 且脈絡連貫 |
+| 第 5 課 | `--permission-mode plan` | PR 審查步驟完全唯讀，AI 看完 diff 只能留言，不能改生產程式碼 |
+| 第 6 課 | 平行 `&` + `wait` | PR 審查同時跑安全/品質/規範三個維度，省 2/3 時間且無思維污染 |
 
 ### 實際結果
 
-（演練時填入）
+Part 4 全部 7 課完成。六個技術各司其職，整合成生產可用的 CI/CD Pipeline。
 
 ---
 
