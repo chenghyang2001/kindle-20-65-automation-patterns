@@ -19,34 +19,37 @@
 
 ## Step 1：閱讀 managed-settings.json，理解組織層強制規則
 
-### 閱讀任務
+### Deny 清單的理由
 
-打開 `managed-settings/managed-settings.json`，回答：
+| 被禁止的操作 | 為什麼這是組織層級要管的事？ |
+|------------|--------------------------|
+| `git push --force *` | 可覆寫任何人的 commit 歷史，影響整個團隊，不是個人問題 |
+| `git push origin main` | main 分支是產品主線，直接推送繞過 PR/review 流程，影響所有使用者 |
+| `git push origin master` | 同上（舊專案常用 master 作主分支名稱） |
+| `npm publish *` | 發佈到公開 registry 影響全球使用者，必須有發佈流程授權 |
+| `Read(//etc/**)` | `/etc/` 含系統配置（密碼 hash、sudoers、SSH config），讀取 = 資安漏洞 |
+| `Read(~/.*)`| 家目錄隱藏檔含 `~/.ssh/`（私鑰）、`~/.aws/`（雲端憑證）、`~/.gitconfig`（身份），讀取 = 身份盜用 |
 
-1. 這份設定的 Deny 清單禁止了哪些操作？
+### 兩個鎖定開關
 
-   | 被禁止的操作 | 為什麼這是組織層級要管的事？ |
-   |------------|--------------------------|
-   | `git push --force *` | |
-   | `git push origin main` | |
-   | `git push origin master` | |
-   | `npm publish *` | |
-   | `Read(//etc/**)` | |
-   | `Read(~/.*)`| |
+1. `allowManagedPermissionRulesOnly: true` 的意思：
 
-2. `allowManagedPermissionRulesOnly: true` 的意思是什麼？
-   （提示：如果開發者在自己的 `settings.json` 裡加了一條新的 Allow 規則，這個設定會怎麼處理它？）
+   答：開發者在自己的 `settings.json` 加的任何 Allow 規則**全部無效、被忽略**。
 
-   答：
+   具體行為：
+   - 開發者在 `.claude/settings.json` 加 `"allow": ["Bash(npm publish *)"]`
+   - 結果：這條規則被忽略，AI 的實際行為：npm publish 仍然被拒絕
 
-3. `disableBypassPermissionsMode: "disable"` 的作用是什麼？
-   （提示：第 3、4 課裡有沒有辦法暫時跳過規則？這個設定封掉了什麼？）
+   防止「開發者幫自己開後門」——沒有組織明確授權就不能執行。
 
-   答：
+2. `disableBypassPermissionsMode: "disable"` 的作用：
+
+   答：封鎖「Bypass Permission Mode」——一種可以暫時跳過所有權限限制的緊急模式。
+   `FORCE_DIRECT_WRITE=1` 等逃生門被焊死：即使開發者知道這個模式，組織政策仍然生效，無法跳過。
 
 ### 實際結果
 
-（演練時填入）
+讀取 managed-settings.json 確認：6 條 Deny（保護生產分支/套件發布/系統機密）+ 兩個鎖定開關（allowManagedPermissionRulesOnly + disableBypassPermissionsMode）。
 
 ---
 
@@ -62,100 +65,120 @@
 專案設定（.claude/settings.json）← 只適用當前專案
 ```
 
-### 填表
+### 三層職責分工
 
 | 設定層次 | 誰能修改 | 誰能被它覆蓋 | 適合放什麼規則 |
 |---------|---------|------------|------------|
-| 組織 Managed Settings | 只有 IT/安全部門 | 所有個人與專案設定 | |
-| 個人 settings.json | 開發者本人 | 只有專案設定 | |
-| 專案 settings.json | 任何有 git 權限的人 | 無（最低層） | |
+| 組織 Managed Settings | 只有 IT/安全部門（透過 MDM/GPO） | 所有個人與專案設定 | 全公司不可逾越的底線（生產環境保護、機密存取） |
+| 個人 settings.json | 開發者本人 | 只有專案設定 | 個人習慣（偏好工具、常用 git 指令） |
+| 專案 settings.json | 任何有 git 權限的人 | 無（最低層） | 當前專案特有需求（特定測試指令、特定路徑許可） |
 
 ### 思考問題
 
-1. 為什麼要把 `git push origin main` 設為組織層 Deny 而不是口頭規定？
+1. 為什麼 `git push origin main` 要組織層 Deny 而不是口頭規定？
 
-   答：
+   答：口頭規定三個失效場景：
+   (1) 新人不知道（沒人告訴他）
+   (2) 老人忘記了（手速快，忘了這條規則）
+   (3) AI 不知道（沒有寫進 prompt，AI 按照指示直接推）
 
-2. 如果某個開發者說「我需要 `npm publish`，我的工作就是發布套件」，
-   他能在自己的 settings.json 把它從 Deny 移除嗎？為什麼？
+   口頭規定依賴「人類記得」；Managed Settings 依賴「系統強制」——在凌晨三點趕 deadline 時，只有系統強制是可靠的。
 
-   答：
+2. 開發者能在自己的 settings.json 把 `npm publish` 移除嗎？
 
-3. `Read(~/.*)`（讀取家目錄的隱藏檔案）被組織層 Deny。
-   這保護了什麼？（想想 `~/.ssh/`、`~/.gitconfig`、`~/.aws/`）
+   答：**不能**。`allowManagedPermissionRulesOnly: true` 讓開發者的個人 Allow 規則完全無效。Managed Settings 的 Deny 規則無法被下層覆蓋。正確做法：向 IT 申請，由他們在 Managed Settings 的 allow 清單中加例外。
 
-   答：
+3. `Read(~/.*)`（家目錄隱藏檔）Deny 保護了什麼？
+
+   | 路徑 | 內容 | 洩漏後果 |
+   |------|------|---------|
+   | `~/.ssh/id_rsa` | SSH 私鑰 | 攻擊者可登入任何授權的伺服器 |
+   | `~/.aws/credentials` | AWS 存取金鑰 | 可操控整個 AWS 帳號（刪 S3、開 EC2 挖礦） |
+   | `~/.gitconfig` | Git 身份設定（含 token） | 可以以你的名義 commit、push |
+   | `~/.npmrc` | npm 認證 token | 可以發布套件到你的帳號下 |
+   | `~/.claude/settings.json` | Claude Code 的所有設定 | 可了解並繞過你的安全設定 |
 
 ### 實際結果
 
-（演練時填入）
+理解三層優先順序：組織 > 個人 > 專案，不可逆轉。口頭規定 vs 系統強制的核心差異：後者在任何條件下都生效。
 
 ---
 
-## Step 3：閱讀 plist，理解 macOS MDM 的部署機制
+## Step 3：閱讀 plist，理解 macOS MDM 部署機制
 
-### 閱讀任務
+### 回答
 
-打開 `managed-settings/com.anthropic.claudecode.plist`，回答：
+1. plist 和 managed-settings.json 的差別？
 
-1. plist 檔案的 `<key>managedPermissions</key>` 裡，規則內容和 `managed-settings.json` 有什麼差別？
+   答：內容本質相同（同樣的 Deny 規則、同樣的鎖定開關），但**格式不同**：
+   - plist：XML 格式，macOS MDM 的標準格式，可透過 Apple Business Manager / JAMF 直接部署到每台 Mac
+   - JSON：Claude Code 直接讀取的格式
+
+   MDM 讀 plist → 轉換為系統策略 → Claude Code 讀取系統策略執行
+
+2. 為什麼需要 MDM 而不是直接放 repo？
+
+   答：放 repo 的開發者繞過方式：
+   (1) 直接編輯：`vim .claude/settings.json` 刪掉 Deny 規則
+   (2) 覆蓋環境變數：用 `FORCE_DIRECT_WRITE=1` 跳過
+   (3) 在 repo 外工作：建新目錄不受 repo 層設定影響
+
+   MDM 部署到系統層（`/Library/Managed Preferences/`），開發者沒有 root 權限無法修改——這才是真正的「不可繞過」。
+
+3. Allow 規則不生效的現象解釋：
 
    答：
 
-2. 為什麼組織需要 MDM（Mobile Device Management）來部署這份設定？
-   （提示：如果只是把 JSON 檔案放進 repo，開發者可以怎麼繞過？）
 
-   答：
+   ```
+   開發者的 settings.json：
+     "allow": ["Bash(npm run deploy)"]
+     
+   MDM 設定：
+     "allowManagedPermissionRulesOnly": true
+     
+   系統行為：
+     讀取 Managed Settings → 看到 allowManagedPermissionRulesOnly: true
+     → 忽略所有來自 ~/.claude 和 .claude 的 allow 規則
+     → 開發者的 allow 被丟棄 → npm run deploy 被拒絕
+```
 
-3. MDM 部署後，開發者打開 `~/.claude/settings.json` 發現某條 Allow 規則「不生效」。
-   他去問 IT，IT 說這是 `allowManagedPermissionRulesOnly: true` 造成的。
-   請解釋這個現象：
-
-   答：
+   白話說：**「組織說了算，你的 Allow 規則無效」**。
 
 ### 實際結果
 
-（演練時填入）
+理解 plist 是 MDM 部署的格式橋樑；MDM 部署到系統層是唯一真正「不可繞過」的部署方式。
 
 ---
 
 ## Step 4：設計「初級工程師安全防護」的 Managed Settings
 
-### 情境
-
-你的公司剛招了一批實習生和初級工程師，你是技術負責人。
-你要設計一份 Managed Settings，確保他們無法意外破壞生產環境：
-
-**必須禁止的操作（寫出 Deny 規則）：**
-
-- 強制推送任何分支
-- 推送到 main 或 production 分支
-- 發布 npm 套件
-- 讀取系統配置（`/etc/`）
-- 讀取同事的家目錄下的隱藏檔案
-
-**必須啟用的政策鎖定：**
-
-- 不讓他們自己加新的 Allow 規則
-- 不讓他們用「繞過模式」跳過規則
-
-填入完整的 JSON 設定：
+### 完整設定
 
 ```json
 {
   "permissions": {
     "deny": [
-      （填入 Deny 規則）
+      "Bash(git push --force *)",
+      "Bash(git push origin main)",
+      "Bash(git push origin production)",
+      "Bash(npm publish *)",
+      "Read(//etc/**)",
+      "Read(~/.*)"
     ]
   },
-  "allowManagedPermissionRulesOnly": ___________,
-  "disableBypassPermissionsMode": "___________"
+  "allowManagedPermissionRulesOnly": true,
+  "disableBypassPermissionsMode": "disable"
 }
 ```
 
+### 觀察
+
+和原始 `managed-settings.json` 幾乎完全一樣（多了 `production` 分支保護）——原始設計本身就已經是「初級工程師安全防護」的最小完整實現。這說明 Managed Settings 的設計直接對應最小權限原則，不需要多餘規則。
+
 ### 實際結果
 
-（演練時填入）
+設計完成：6 條 Deny + 兩個鎖定開關，與原始設計高度吻合。
 
 ---
 
@@ -167,7 +190,7 @@ Managed Settings 的兩個鎖定開關：
   allowManagedPermissionRulesOnly: true
     → 開發者在個人或專案 settings.json 加的 Allow 規則「全部無效」
     → AI 只能遵守組織明確允許的那些操作
-    → 防止：開發者自己幫自己開後門
+    → 防止：開發者幫自己開後門
 
   disableBypassPermissionsMode: "disable"
     → 封鎖「暫時繞過所有限制」的模式（Bypass Permission Mode）
@@ -179,8 +202,12 @@ Managed Settings 的兩個鎖定開關：
   個人 → 在底線內設定個人習慣
   專案 → 在個人設定內調整當前專案需求
 
+口頭規定 vs 系統強制：
+  口頭規定依賴人類記得，凌晨三點趕 deadline 必定失效
+  系統強制沒有「我忘了」「我以為可以」的空間
+
 plist vs JSON：
-  macOS MDM 用 plist 部署 → 開發者無法自行修改（系統層強制執行）
-  JSON 放 repo → 開發者可以自行改掉（不可靠）
-  企業環境必須透過 MDM/GPO 部署，才能真正「管理」
+  JSON 放 repo → 開發者可以直接改
+  MDM 部署系統層 → 沒有 root 就改不了
+  企業環境必須透過 MDM/GPO 部署才能真正「管理」
 ```
