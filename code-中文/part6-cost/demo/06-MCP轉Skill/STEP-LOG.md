@@ -1,17 +1,11 @@
 # 第 6 課演練記錄：MCP 轉 Skill 削減開銷
 
-> 對應文件：
->
-> - `code-中文/part6-cost/mcp-to-skill/README.md`
-> - `code-中文/part6-cost/mcp-to-skill/SKILL.md`
-> - `code-中文/part6-cost/settings/minimal-mcp.json`
+> 對應文件：`code-中文/part6-cost/mcp-to-skill/SKILL.md`
 
 ## 課程目標
 
-理解 MCP 工具的隱形成本：每次請求都強制附上所有 MCP 工具的 JSON schema，
-就算只是改個 CSS 顏色也一樣。
-學會判斷哪些 MCP 應該換成 Skill，哪些必須保留，
-並用 `permissions.deny` 關掉不需要的 MCP。
+理解 MCP server 的 schema overhead 隱形成本，
+學會判斷何時用 Skill 取代 MCP，以 `fetch-docs` 為範例。
 
 ## 工作目錄
 
@@ -19,195 +13,77 @@
 
 ---
 
-## Step 1：理解 MCP 的隱形 Token 成本
+## Step 1：理解 MCP Schema Overhead 問題
 
-### 概念說明
-
-每次你和 Claude Code 對話，系統會把「所有已啟用的 MCP 工具的 JSON schema」附在請求裡。
+### Q1：每月 schema overhead 計算
 
 ```
-一次對話請求的 Input token 組成：
-  CLAUDE.md                 ≈ 2,000 token
-  對話歷史                  ≈ 10,000 token
-  你的問題                  ≈ 100 token
-  MCP 工具說明（23 個工具）  ≈ 8,000 token   ← 你可能完全沒意識到
-  ────────────────────────────────────────
-  總計                      ≈ 20,100 token
+23 工具 × 350 token × 100 輪/天 × 30 天 = 24,150,000 token/月
+換算 Sonnet 費用：24.15M × $3/M = $72.45/月
 ```
 
-### 計算練習
+**這是固定成本，不管有沒有用那些 MCP 工具，每輪都付。**
 
-假設你有 23 個 MCP 工具（包含 Playwright、Magic UI 等），
-每個工具的 JSON schema 平均 350 token，
-你每天和 Claude Code 對話 100 輪：
+### Q2：對「只寫 Python 腳本」任務的影響
 
-1. MCP schema 每天消耗多少 token？
+settings.json 啟用 80+ 個 MCP 工具（puppeteer、notebooklm、Gmail、Google Calendar...）。
+當任務只是「寫解析 CSV 的 Python 腳本」，這 80+ 個工具的 schema 全部注入，
+為「用不到的工具說明書」付 token。
 
-   答：
-
-2. 一個月（30 天）消耗多少 token？
-
-   答：
-
-3. 如果你用 Sonnet（$3/M token），MCP schema 每月花多少錢？
-
-   答：
-
-4. 如果你有 10 個 MCP 根本不常用，把它們 deny 掉後能省多少？
-
-   答：
-
-### 實際結果
-
-（演練時填入）
+**MCP 的隱性成本模型：按輪計費，不按使用計費。**
 
 ---
 
-## Step 2：閱讀 MCP 轉 Skill 的判斷標準
+## Step 2：SKILL.md 的解法
 
-### 閱讀任務
+### Q3：`fetch-docs` Skill 取代了什麼？
 
-打開 `mcp-to-skill/README.md`，填入判斷表格：
+> 第 33 行：「這個 skill 取代了**只為簡單文件抓取而架 MCP server** 的需求」
 
-**什麼時候該保留 MCP**（填入 README 中的 4 個條件）：
+傳統做法：需要抓文件 → 裝 fetch-mcp 或 browser-mcp → 又多了一個 MCP server → 又多了 N 個 schema 每輪注入。
 
-| # | 條件 |
-|---|------|
-| 1 | |
-| 2 | |
-| 3 | |
-| 4 | |
+Skill 解法：不裝 MCP，改用 Bash + curl。效果一樣，但 schema overhead = 0。
 
-**什麼時候該改用 Skill**（填入 README 中的 4 個條件）：
+### Q4：`allowed-tools: Bash(curl *), Bash(npx *)` 的成本效益
 
-| # | 條件 |
-|---|------|
-| 1 | |
-| 2 | |
-| 3 | |
-| 4 | |
+Skill 觸發時，Claude 的工具清單從完整清單縮減為只有這兩個：
 
-### 情境判斷
+| 狀態 | 可用工具 | Context 裡的 schema |
+|------|---------|-------------------|
+| 一般對話 | 全部工具（80+個） | 全部 schema |
+| `/fetch-docs` Skill 執行中 | `Bash(curl *)`, `Bash(npx *)` | 只有 2 條規則 |
 
-對於以下工具，你會選擇「保留 MCP」還是「改用 Skill」？
-
-| 工具描述 | 你的選擇 | 原因 |
-|---------|---------|------|
-| 抓取 React 官方文件的某個頁面 | | |
-| 管理 Slack workspace（需要 OAuth + 訊息歷史） | | |
-| 截圖驗證 UI（需要 Chromium + session） | | |
-| 用 curl 取得某個 REST API 的公開資料 | | |
-| 把 Markdown 轉成 HTML（一行 CLI 指令）| | |
-
-### 實際結果
-
-（演練時填入）
+好處雙重：輸入 token 大幅縮小 + 行為更聚焦（不會誤用其他工具）
 
 ---
 
-## Step 3：閱讀 fetch-docs Skill，理解轉換成果
+## Step 3：何時用 Skill 取代 MCP？
 
-### 閱讀任務
+| 情境 | 用 MCP | 用 Skill |
+|------|--------|---------|
+| 需要持久連線（OAuth、session）| ✅ | ✗ |
+| 需要即時資料（日曆、郵件）| ✅ | ✗ |
+| 只是執行指令（curl、bash）| ✗ | ✅ |
+| 一次性操作（抓文件、轉格式）| ✗ | ✅ |
+| 使用頻率低（每月幾次）| ✗ | ✅ |
 
-打開 `mcp-to-skill/SKILL.md`，回答：
-
-1. 這個 Skill 的 `allowed-tools` 限制了什麼？為什麼要限制？
-
-   答：
-
-2. 這個 Skill 取代了什麼樣的 MCP server？
-
-   答：
-
-3. 「優先抓取官方文件，而非依賴訓練知識」這條注意事項的背後邏輯是什麼？
-
-   答：
-
-### 比較成本
-
-| 方式 | 每次請求的 token 開銷 |
-|------|---------------------|
-| 架一個 fetch-docs MCP server | schema ≈ 500 token × 每次請求 |
-| 換成 SKILL.md | 只在呼叫 /fetch-docs 時載入，其餘請求 0 overhead |
-
-### 實際結果
-
-（演練時填入）
-
----
-
-## Step 4：使用 minimal-mcp.json 關掉不需要的 MCP
-
-### 閱讀任務
-
-打開 `settings/minimal-mcp.json`，回答：
-
-1. 這個設定 deny 了哪兩個 MCP 的所有工具？
-
-   答：
-
-2. `mcp__playwright__*` 中的 `*` 是什麼意思？
-
-   答：
-
-3. 你如何在自己的 `~/.claude/settings.json` 加入這個設定？
-
-   （寫出合併後的 JSON 結構）
-
-   ```json
-   {
-     （填入）
-   }
-   ```
-
-### 操作步驟
-
-確認你目前有哪些 MCP 工具（若有的話）：
-
-```bash
-# 查看 settings.json 中的 mcpServers 設定
-cat ~/.claude/settings.json | python -c "
-import json, sys
-data = json.load(sys.stdin)
-servers = data.get('mcpServers', {})
-print(f'已安裝的 MCP server：{len(servers)} 個')
-for name in servers:
-    print(f'  - {name}')
-"
-```
-
-回答：你有幾個 MCP server？哪些是真正常用的？
-
-答：
-
-### 實際結果
-
-（演練時填入）
+**口訣：能用 Bash 做到的，就不裝 MCP。**
 
 ---
 
 ## 本課重點
 
 ```
-MCP 的隱形成本公式：
-  每次請求的 MCP overhead = 工具數量 × 每個工具 schema 大小
-  23 個工具 × 350 token = 8,050 token / 每次請求
+MCP Schema Overhead 公式：
+  工具數 × schema大小(token) × 對話輪數/天 × 天數 = 月總開銷
 
-  100 輪/天 × 8,050 token × 30 天 = 24,150,000 token/月
-  用 Sonnet 計算 = 約 $72/月（只是 MCP schema）
-
-三種削減方式：
-  1. deny 不常用的 MCP（立即生效，最簡單）
-  2. 把簡單的 MCP 換成 Skill（長期最優解）
-  3. 只在需要時動態啟用特定 MCP（高階）
-
-判斷原則：
-  需要狀態 / OAuth / 串流 → 保留 MCP
-  只是 CLI 指令 / 公開文件 / 簡單處理 → 換成 Skill
+三種削減策略：
+  1. 只開必要的 MCP server（disable 不常用的）
+  2. 能用 Bash 做到的改寫成 Skill
+  3. 用 deny 清單封掉高 schema 但低使用率的工具
 ```
 
-| 操作 | 難度 | 效果 |
-|------|------|------|
-| deny 不用的 MCP | ★☆☆ | 立即省 X × 350 token/次 |
-| MCP 改寫成 Skill | ★★☆ | 長期：只有呼叫時才有開銷 |
-| 重新設計 MCP 架構 | ★★★★ | 最大化節省，但需要時間 |
+| 方案 | schema overhead | 維護成本 | 適合情境 |
+|------|----------------|---------|---------|
+| MCP server | 每輪注入全部 schema | 需要認證維護 | 需要 session/即時資料 |
+| SKILL.md | 只在觸發時生效 | 只是一個 .md 檔 | 可用 Bash 完成的任務 |
