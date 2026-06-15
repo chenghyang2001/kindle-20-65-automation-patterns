@@ -14,10 +14,10 @@
 | Part 3 | Sub-agents | ✅ 7 課全部完成 |
 | Part 4 | CI/CD | ✅ 7 課全部完成 |
 | Part 5 | 權限與資安 | ✅ 7 課全部完成（commit d1566b2） |
-| Part 6 | 成本最佳化 | 🔲 **待開始**（下一個要做的） |
+| Part 6 | 成本最佳化 | ✅ 7 課全部完成（commit 見 session-part6-L1-L7-summary.md） |
 | Part 7 | Plugin | 🔲 待開始 |
 
-**下一步：Part 6 第 1 課「看懂 Token 帳單」**
+**下一步：Part 7 第 1 課（Plugin 開發）**
 
 ---
 
@@ -30,7 +30,7 @@
 3. 使用者說「**存檔進第 N 課**」→ 助理寫 STEP-LOG.md + commit + push
 4. 助理自動呈現下一課
 
-說「**繼續 Part 6**」即可從第 1 課開始。
+說「**繼續 Part 7**」即可從 Part 7 第 1 課開始。
 
 ---
 
