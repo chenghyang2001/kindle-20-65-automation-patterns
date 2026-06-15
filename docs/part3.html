@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Part 3 — Sub-agents | Claude Code Patterns</title>
+<style>
+:root{--bg:#fff;--bg2:#f8fafc;--bg3:#f1f5f9;--border:#e2e8f0;--text:#1e293b;--text2:#64748b;--blue:#2563eb;--bl:#eff6ff;--green:#10b981;--gl:#ecfdf5;--red:#ef4444;--rl:#fef2f2;--yellow:#f59e0b;--yl:#fffbeb;--purple:#7c3aed;--pl:#f5f3ff;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);line-height:1.6;}
+.top-nav{background:var(--text);padding:0 32px;display:flex;align-items:center;gap:24px;height:52px;position:sticky;top:0;z-index:100;}
+.nav-brand{color:#fff;font-weight:700;font-size:15px;text-decoration:none;}
+.nav-links{display:flex;gap:4px;flex-wrap:wrap;}
+.nav-links a{color:#94a3b8;font-size:12px;padding:4px 8px;border-radius:4px;text-decoration:none;}
+.nav-links a:hover,.nav-links a.active{color:#fff;background:rgba(255,255,255,0.15);}
+.part-hero{background:var(--pl);border-bottom:2px solid var(--purple);padding:32px 48px;}
+.part-hero h1{font-size:26px;font-weight:800;color:var(--purple);}
+.part-hero p{color:var(--text2);font-size:14px;margin-top:6px;}
+.main{max-width:860px;margin:0 auto;padding:40px 48px;}
+.section{margin-bottom:56px;}
+.sec-title{font-size:18px;font-weight:700;margin-bottom:6px;}
+.sec-desc{color:var(--text2);font-size:13px;margin-bottom:16px;}
+.code{background:#0f172a;color:#e2e8f0;border-radius:8px;padding:16px;font-family:monospace;font-size:12px;line-height:1.8;}
+.code .kw{color:#60a5fa;}.code .str{color:#86efac;}.code .cmt{color:#475569;}
+.agent-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.agent-card{border:2px solid var(--border);border-radius:8px;padding:16px;cursor:pointer;transition:all 0.2s;}
+.agent-card:hover,.agent-card.active{border-color:var(--purple);background:var(--pl);}
+.agent-name{font-weight:700;font-size:14px;margin-bottom:4px;}
+.agent-type{font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px;display:inline-block;margin-bottom:8px;background:var(--pl);color:var(--purple);}
+.agent-desc{font-size:12px;color:var(--text2);line-height:1.5;}
+.model-table{width:100%;border-collapse:collapse;}
+.model-table th,.model-table td{border:1px solid var(--border);padding:10px 14px;text-align:left;font-size:13px;}
+.model-table th{background:var(--bg2);font-weight:600;}
+.model-table tr:hover{background:var(--bg2);}
+.badge-h{background:var(--gl);color:var(--green);font-weight:700;padding:2px 8px;border-radius:4px;font-size:12px;}
+.badge-s{background:var(--bl);color:var(--blue);font-weight:700;padding:2px 8px;border-radius:4px;font-size:12px;}
+.badge-o{background:var(--rl);color:var(--red);font-weight:700;padding:2px 8px;border-radius:4px;font-size:12px;}
+.badge-i{background:var(--yl);color:var(--yellow);font-weight:700;padding:2px 8px;border-radius:4px;font-size:12px;}
+.ratio-table{width:100%;border-collapse:collapse;}
+.ratio-table th,.ratio-table td{border:1px solid var(--border);padding:8px 12px;text-align:left;font-size:13px;}
+.ratio-table th{background:var(--bg2);font-weight:600;}
+.rationalization{background:var(--rl);border:1px solid var(--red);border-radius:8px;padding:20px;}
+.ratio-row{display:flex;gap:12px;align-items:flex-start;padding:8px 0;border-bottom:1px solid rgba(239,68,68,0.15);}
+.ratio-row:last-child{border-bottom:none;}
+.ratio-say{flex:1;font-size:13px;color:var(--red);font-weight:500;}
+.ratio-means{flex:1;font-size:13px;color:var(--text2);}
+.ratio-do{flex:1;font-size:13px;color:var(--green);font-weight:500;}
+.pipeline-flow{display:flex;align-items:center;gap:8px;padding:16px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;flex-wrap:wrap;}
+.pipe-box{padding:8px 14px;border-radius:6px;font-size:12px;font-weight:600;white-space:nowrap;}
+.pipe-arrow{color:var(--text2);font-size:16px;}
+</style>
+</head>
+<body>
+<nav class="top-nav">
+  <a href="index.html" class="nav-brand">Claude Code Patterns</a>
+  <div class="nav-links">
+    <a href="part1.html">P1 設計基礎</a>
+    <a href="part2.html">P2 Hooks</a>
+    <a href="part3.html" class="active">P3 Sub-agents</a>
+    <a href="part4.html">P4 CI/CD</a>
+    <a href="part5.html">P5 安全</a>
+    <a href="part6.html">P6 成本</a>
+    <a href="part7.html">P7 工作流</a>
+  </div>
+</nav>
+
+<div class="part-hero">
+  <h1>Part 3 — Sub-agents</h1>
+  <p>6 個內建 Agent · 模型選擇矩陣 · 反理由化行為 · 串聯審查流水線</p>
+</div>
+
+<div class="main">
+
+  <!-- Section 1: 6 個內建 Agent -->
+  <div class="section">
+    <div class="sec-title">6 個內建 Agent 解剖</div>
+    <div class="sec-desc">點擊卡片查看每個 agent 的職責與適用場景。</div>
+    <div class="agent-grid">
+      <div class="agent-card active" id="card-explore" onclick="selectAgent('explore',this)">
+        <div class="agent-name">🔍 Explore</div>
+        <span class="agent-type">探索型</span>
+        <div class="agent-desc">快速搜尋程式碼庫：找檔案、找符號、回答「X 在哪裡定義」。唯讀模式，不修改任何檔案。</div>
+      </div>
+      <div class="agent-card" id="card-plan" onclick="selectAgent('plan',this)">
+        <div class="agent-name">🗺️ Plan</div>
+        <span class="agent-type">規劃型</span>
+        <div class="agent-desc">在實作前設計步驟清單、評估架構 trade-off、識別關鍵檔案。只輸出計畫，不自己動手。</div>
+      </div>
+      <div class="agent-card" id="card-executor" onclick="selectAgent('executor',this)">
+        <div class="agent-name">🔨 Executor</div>
+        <span class="agent-type">實作型</span>
+        <div class="agent-desc">埋頭實作個別 spec 任務，寫乾淨且通過測試的程式碼，遵守專案 conventions。</div>
+      </div>
+      <div class="agent-card" id="card-reviewer" onclick="selectAgent('reviewer',this)">
+        <div class="agent-name">👀 Code Reviewer</div>
+        <span class="agent-type">審查型</span>
+        <div class="agent-desc">對程式碼做 adversarial review，找 bug、安全漏洞、邏輯錯誤，列 MUST_FIX 與 NICE_TO_HAVE。</div>
+      </div>
+      <div class="agent-card" id="card-debug" onclick="selectAgent('debug',this)">
+        <div class="agent-name">🐛 Debug Expert</div>
+        <span class="agent-type">除錯型</span>
+        <div class="agent-desc">追根究柢找 bug，用二分搜尋法、假設-驗證流程系統性診斷問題，不找到根因不罷休。</div>
+      </div>
+      <div class="agent-card" id="card-verify" onclick="selectAgent('verify',this)">
+        <div class="agent-name">✅ Verify App</div>
+        <span class="agent-type">驗證型</span>
+        <div class="agent-desc">端對端驗證應用程式可運作，可用 Puppeteer 截圖確認 UI、執行 smoke test。</div>
+      </div>
+    </div>
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:20px;margin-top:12px;">
+      <div id="agent-detail" style="font-size:13px;color:var(--text2)">
+        <strong style="color:var(--text)">Explore</strong> — 用途：大範圍 codebase 搜尋、按 pattern 找檔、快速回答「X 在哪」。<br>
+        <strong>不該做</strong>：不寫程式只找檔、不做深度架構分析。<br>
+        <strong>觸發時機</strong>：「找所有用到 fetchRoom 的地方」「哪個檔案定義了 AuthMiddleware？」
+        <div class="code" style="margin-top:12px">
+<span class="kw">Agent</span>({
+  subagent_type: <span class="str">"Explore"</span>,
+  prompt: <span class="str">"找所有呼叫 pymysql.connect 的 .py 檔，列出路徑和行號"</span>
+})</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 2: 模型選擇矩陣 -->
+  <div class="section">
+    <div class="sec-title">模型選擇矩陣</div>
+    <div class="sec-desc">正確的模型選擇可節省 60-80% 的 token 成本。</div>
+    <table class="model-table">
+      <tr><th>任務類型</th><th>推薦模型</th><th>理由</th></tr>
+      <tr><td>檔案探索 / 搜尋 / log 查詢</td><td><span class="badge-h">Haiku</span></td><td>只需讀取、速度優先，推理能力不是關鍵</td></tr>
+      <tr><td>格式審查 / Pattern matching</td><td><span class="badge-h">Haiku</span></td><td>規則性強，Haiku 已足夠</td></tr>
+      <tr><td>Bug 修復 / 一般實作</td><td><span class="badge-s">Sonnet</span></td><td>平衡能力與成本，大多數任務的最佳選擇</td></tr>
+      <tr><td>安全稽核 / 架構設計</td><td><span class="badge-s">Sonnet</span></td><td>需要較強推理，但不需要 Opus 等級</td></tr>
+      <tr><td>大規模重構 / 複雜多步驟</td><td><span class="badge-i">Inherit</span></td><td>繼承主 Claude 模型，保持一致性</td></tr>
+      <tr><td>極複雜推理 / 關鍵決策</td><td><span class="badge-o">Opus</span></td><td>最高能力，但成本也最高，謹慎使用</td></tr>
+    </table>
+    <div class="code" style="margin-top:16px">
+<span class="cmt"># 探索型 agent 指定 Haiku — 省 60-80% token</span>
+<span class="kw">Agent</span>({
+  subagent_type: <span class="str">"Explore"</span>,
+  model: <span class="str">"haiku"</span>,
+  prompt: <span class="str">"搜尋 code/ 目錄下所有 .sh 檔，列出檔名和第一行"</span>
+})</div>
+  </div>
+
+  <!-- Section 3: 反理由化行為 -->
+  <div class="section">
+    <div class="sec-title">反理由化行為對照表</div>
+    <div class="sec-desc">當 AI 說出以下借口時，就是在迴避任務。正確做法是直接執行並回報阻礙。</div>
+    <div class="rationalization">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-weight:700;font-size:12px;color:var(--text2);padding-bottom:8px;border-bottom:1px solid rgba(239,68,68,0.3);margin-bottom:8px;">
+        <span>AI 說的話</span><span>真正的意思</span><span>正確應對</span>
+      </div>
+      <div class="ratio-row"><div class="ratio-say">「檔案太大」</div><div class="ratio-means">懶得讀</div><div class="ratio-do">用 Read 只讀需要的範圍</div></div>
+      <div class="ratio-row"><div class="ratio-say">「測試太複雜」</div><div class="ratio-means">不想修測試</div><div class="ratio-do">先修測試，再實作</div></div>
+      <div class="ratio-row"><div class="ratio-say">「與現有程式碼不相容」</div><div class="ratio-means">沒把握改</div><div class="ratio-do">改了，再另行回報相容性問題</div></div>
+      <div class="ratio-row"><div class="ratio-say">「擔心有副作用」</div><div class="ratio-means">不想改</div><div class="ratio-do">最小化改動，文件化副作用</div></div>
+      <div class="ratio-row"><div class="ratio-say">「有更好的做法」</div><div class="ratio-means">想改指示</div><div class="ratio-do">照指示執行，結尾建議替代方案</div></div>
+      <div class="ratio-row"><div class="ratio-say">「發生錯誤了」</div><div class="ratio-means">想停止</div><div class="ratio-do">分析錯誤，嘗試解法，再回報</div></div>
+    </div>
+  </div>
+
+  <!-- Section 4: 串聯審查流水線 -->
+  <div class="section">
+    <div class="sec-title">串聯審查流水線</div>
+    <div class="sec-desc">PR 審查或功能完成後，按以下順序串聯 reviewer，每個只做一件事，Context 乾淨，判斷更準。</div>
+    <div class="pipeline-flow">
+      <span class="pipe-box" style="background:var(--bl);color:var(--blue)">Spec Compliance<br>Reviewer</span>
+      <span class="pipe-arrow">→</span>
+      <span class="pipe-box" style="background:var(--gl);color:var(--green)">Code Quality<br>Reviewer</span>
+      <span class="pipe-arrow">→</span>
+      <span class="pipe-box" style="background:var(--rl);color:var(--red)">Security<br>Reviewer</span>
+      <span class="pipe-arrow">→</span>
+      <span class="pipe-box" style="background:var(--yl);color:var(--yellow)">API Reviewer<br>（視需要）</span>
+    </div>
+    <div class="code" style="margin-top:16px">
+<span class="cmt"># Writer → QA → Reviewer 三段式鐵律</span>
+<span class="cmt"># Step 1: 寫檔</span>
+<span class="kw">Agent</span>({ subagent_type: <span class="str">"code-writer"</span>, prompt: <span class="str">"寫 hooks/audit.sh..."</span> })
+<span class="cmt"># Step 2: 靜態+動態驗證（等 writer 完成後）</span>
+<span class="kw">Agent</span>({ subagent_type: <span class="str">"code-qa"</span>, prompt: <span class="str">"驗證 Manifest: 存在/SHA256/語法/動態..."</span> })
+<span class="cmt"># Step 3: Adversarial review（QA PASS 後）</span>
+<span class="kw">Agent</span>({ subagent_type: <span class="str">"code-reviewer"</span>, prompt: <span class="str">"Adversarial review: 列 MUST_FIX..."</span> })</div>
+  </div>
+
+</div>
+
+<script>
+const details={
+  explore:`<strong style="color:var(--text)">Explore</strong> — 大範圍 codebase 搜尋、按 pattern 找檔、快速回答「X 在哪」。<br><strong>不該做</strong>：不寫程式只找檔，不做深度架構分析（找 Plan）。<br><strong>觸發時機</strong>：「找所有用到 fetchRoom 的地方」「哪個檔案定義了 AuthMiddleware？」<div class="code" style="margin-top:12px"><span class="kw">Agent</span>({ subagent_type: <span class="str">"Explore"</span>, model: <span class="str">"haiku"</span>, prompt: <span class="str">"找所有 pymysql.connect 呼叫"</span> })</div>`,
+  plan:`<strong style="color:var(--text)">Plan</strong> — 在動手前設計步驟清單、評估 trade-off、識別關鍵檔案。<br><strong>不該做</strong>：不直接實作（交給 Executor）。<br><strong>觸發時機</strong>：「在開始前幫我規劃一下怎麼重構 auth 模組」<div class="code" style="margin-top:12px"><span class="kw">Agent</span>({ subagent_type: <span class="str">"Plan"</span>, prompt: <span class="str">"設計 GitHub Actions CI/CD 的步驟清單"</span> })</div>`,
+  executor:`<strong style="color:var(--text)">Executor（spec-task-executor）</strong> — 埋頭實作個別 spec 任務，遵守 conventions，不囉嗦直接開工。<br><strong>不該做</strong>：不設計架構（找 Plan）。<br><strong>觸發時機</strong>：規格明確後，「按這份 spec 實作 L3.sh」<div class="code" style="margin-top:12px"><span class="kw">Agent</span>({ subagent_type: <span class="str">"spec-task-executor"</span>, isolation: <span class="str">"worktree"</span>, prompt: <span class="str">"按 spec 實作 save-session.sh"</span> })</div>`,
+  reviewer:`<strong style="color:var(--text)">Code Reviewer</strong> — Adversarial review，找 bug、安全漏洞、邏輯錯誤，列 MUST_FIX 與 NICE_TO_HAVE。<br><strong>觸發時機</strong>：Writer + QA PASS 後的最後把關，或 PR 提交前。<div class="code" style="margin-top:12px"><span class="str">=== Code Review ===</span><br><span class="kw">MUST_FIX</span>:<br>  - SQL 沒有參數化查詢（注入風險）<br><span class="kw">NICE_TO_HAVE</span>:<br>  - 函式超過 30 行，可拆解<br><span class="kw">OVERALL</span>: CHANGES_REQUESTED</div>`,
+  debug:`<strong style="color:var(--text)">Debug Expert</strong> — 追根究柢，不找到根因不罷休。二分搜尋法、假設-驗證、stack trace 解讀。<br><strong>觸發時機</strong>：測試失敗、非預期行為、Claude 自己找不到 bug 時。<div class="code" style="margin-top:12px"><span class="kw">Agent</span>({ subagent_type: <span class="str">"debug-expert"</span>, prompt: <span class="str">"save-session.sh 跑完沒輸出，根因分析"</span> })</div>`,
+  verify:`<strong style="color:var(--text)">Verify App</strong> — 端對端驗證，「不信你說測過了」，要看截圖或 log 證據。<br><strong>觸發時機</strong>：PR 提交前的最終 smoke test，或功能宣稱完成後。<div class="code" style="margin-top:12px"><span class="kw">Agent</span>({ subagent_type: <span class="str">"verify-app"</span>, prompt: <span class="str">"用 Puppeteer 截圖確認 localhost:3000 的 index 頁面正常"</span> })</div>`
+};
+function selectAgent(id,btn){
+  document.querySelectorAll('.agent-card').forEach(c=>c.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('agent-detail').innerHTML=details[id];
+}
+</script>
+</body>
+</html>

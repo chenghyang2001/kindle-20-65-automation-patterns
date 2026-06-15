@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Part 2 — Hook 自動化 | Claude Code Patterns</title>
+<style>
+:root{--bg:#fff;--bg2:#f8fafc;--bg3:#f1f5f9;--border:#e2e8f0;--text:#1e293b;--text2:#64748b;--blue:#2563eb;--bl:#eff6ff;--green:#10b981;--gl:#ecfdf5;--red:#ef4444;--rl:#fef2f2;--yellow:#f59e0b;--yl:#fffbeb;--purple:#7c3aed;--pl:#f5f3ff;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);line-height:1.6;}
+.top-nav{background:var(--text);padding:0 32px;display:flex;align-items:center;gap:24px;height:52px;position:sticky;top:0;z-index:100;}
+.nav-brand{color:#fff;font-weight:700;font-size:15px;text-decoration:none;}
+.nav-links{display:flex;gap:4px;flex-wrap:wrap;}
+.nav-links a{color:#94a3b8;font-size:12px;padding:4px 8px;border-radius:4px;text-decoration:none;}
+.nav-links a:hover,.nav-links a.active{color:#fff;background:rgba(255,255,255,0.15);}
+.part-hero{background:var(--gl);border-bottom:2px solid var(--green);padding:32px 48px;}
+.part-hero h1{font-size:26px;font-weight:800;color:var(--green);}
+.part-hero p{color:var(--text2);font-size:14px;margin-top:6px;}
+.main{max-width:860px;margin:0 auto;padding:40px 48px;}
+.section{margin-bottom:56px;}
+.sec-title{font-size:18px;font-weight:700;margin-bottom:6px;}
+.sec-desc{color:var(--text2);font-size:13px;margin-bottom:16px;}
+.code{background:#0f172a;color:#e2e8f0;border-radius:8px;padding:16px;font-family:monospace;font-size:12px;line-height:1.8;}
+.code .kw{color:#60a5fa;}.code .str{color:#86efac;}.code .cmt{color:#475569;}
+.hook-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;}
+.hook-card{border:2px solid var(--border);border-radius:8px;padding:16px;cursor:pointer;transition:all 0.2s;text-align:center;}
+.hook-card:hover,.hook-card.active{border-color:var(--green);background:var(--gl);}
+.hook-card .hook-icon{font-size:28px;margin-bottom:8px;}
+.hook-card .hook-name{font-weight:700;font-size:14px;}
+.hook-card .hook-timing{font-size:12px;color:var(--text2);margin-top:4px;}
+.hook-detail{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:20px;display:none;}
+.hook-detail.active{display:block;}
+.exit-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+.exit-card{border-radius:8px;padding:16px;text-align:center;}
+.exit-0{background:var(--gl);border:2px solid var(--green);}
+.exit-1{background:var(--rl);border:2px solid var(--red);}
+.exit-2{background:var(--yl);border:2px solid var(--yellow);}
+.exit-code{font-size:32px;font-weight:800;font-family:monospace;}
+.exit-name{font-weight:700;font-size:14px;margin:6px 0;}
+.exit-desc{font-size:12px;color:var(--text2);line-height:1.5;}
+.matcher-box{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:20px;}
+.matcher-row{display:flex;gap:12px;align-items:center;margin-bottom:12px;flex-wrap:wrap;}
+.matcher-row label{font-size:13px;font-weight:600;width:80px;flex-shrink:0;}
+.matcher-row input{flex:1;min-width:160px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:monospace;}
+.match-result{padding:10px 14px;border-radius:6px;font-size:13px;font-weight:600;text-align:center;margin-top:8px;}
+.match-yes{background:var(--gl);color:var(--green);}
+.match-no{background:var(--rl);color:var(--red);}
+.example-list{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.ex-card{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px;}
+.ex-name{font-weight:700;font-size:13px;margin-bottom:4px;}
+.ex-type{font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px;display:inline-block;margin-bottom:8px;}
+.ex-pre{background:var(--bl);color:var(--blue);}
+.ex-post{background:var(--gl);color:var(--green);}
+.ex-stop{background:var(--yl);color:var(--yellow);}
+.ex-desc{font-size:12px;color:var(--text2);line-height:1.6;}
+</style>
+</head>
+<body>
+<nav class="top-nav">
+  <a href="index.html" class="nav-brand">Claude Code Patterns</a>
+  <div class="nav-links">
+    <a href="part1.html">P1 設計基礎</a>
+    <a href="part2.html" class="active">P2 Hooks</a>
+    <a href="part3.html">P3 Sub-agents</a>
+    <a href="part4.html">P4 CI/CD</a>
+    <a href="part5.html">P5 安全</a>
+    <a href="part6.html">P6 成本</a>
+    <a href="part7.html">P7 工作流</a>
+  </div>
+</nav>
+
+<div class="part-hero">
+  <h1>Part 2 — Hook 自動化</h1>
+  <p>PreToolUse · PostToolUse · Stop · Matcher 模式 · Exit Code 控制流</p>
+</div>
+
+<div class="main">
+
+  <!-- Section 1: Hook 時機點 -->
+  <div class="section">
+    <div class="sec-title">Hook 三個時機點</div>
+    <div class="sec-desc">點擊卡片選擇時機點，查看詳細說明與設定範例。</div>
+    <div class="hook-grid">
+      <div class="hook-card active" onclick="showHook('pre',this)">
+        <div class="hook-icon">⚡</div>
+        <div class="hook-name">PreToolUse</div>
+        <div class="hook-timing">工具執行<strong>前</strong>觸發</div>
+      </div>
+      <div class="hook-card" onclick="showHook('post',this)">
+        <div class="hook-icon">✅</div>
+        <div class="hook-name">PostToolUse</div>
+        <div class="hook-timing">工具執行<strong>後</strong>觸發</div>
+      </div>
+      <div class="hook-card" onclick="showHook('stop',this)">
+        <div class="hook-icon">🛑</div>
+        <div class="hook-name">Stop</div>
+        <div class="hook-timing">Claude 準備<strong>結束</strong>時觸發</div>
+      </div>
+    </div>
+    <div class="hook-detail active" id="hook-pre">
+      <strong>PreToolUse</strong>：在 Claude 執行任何工具之前觸發。可用於<br>
+      <ul style="margin:10px 0 10px 20px;font-size:13px;line-height:2;color:var(--text2)">
+        <li>🚫 <strong>阻擋危險操作</strong>（exit 1 → Claude 收到 Error，停止執行）</li>
+        <li>📝 <strong>記錄操作意圖</strong>（exit 0 → 放行，但先寫日誌）</li>
+        <li>🔍 <strong>參數驗證</strong>（檢查路徑、命令格式是否符合規範）</li>
+      </ul>
+      <div class="code">
+<span class="cmt"># settings.json</span>
+{
+  <span class="str">"hooks"</span>: {
+    <span class="str">"PreToolUse"</span>: [{
+      <span class="str">"matcher"</span>: <span class="str">"Bash"</span>,
+      <span class="str">"hooks"</span>: [{ <span class="str">"type"</span>: <span class="str">"command"</span>, <span class="str">"command"</span>: <span class="str">"bash ~/.claude/hooks/check-cmd.sh"</span> }]
+    }]
+  }
+}</div>
+    </div>
+    <div class="hook-detail" id="hook-post">
+      <strong>PostToolUse</strong>：工具執行完成後觸發。適合<br>
+      <ul style="margin:10px 0 10px 20px;font-size:13px;line-height:2;color:var(--text2)">
+        <li>📊 <strong>記錄操作結果</strong>（工具 + 輸入 + 時間戳 → JSONL 日誌）</li>
+        <li>🔔 <strong>發送通知</strong>（Write 完成後 → Telegram 通知）</li>
+        <li>🧹 <strong>格式化</strong>（Edit 完成後 → 自動 lint/format）</li>
+        <li>💡 <strong>成本提示</strong>（Bash 執行後計算 token 消耗）</li>
+      </ul>
+      <div class="code">
+<span class="cmt"># observe-pattern.sh — 記錄所有工具操作</span>
+<span class="kw">#!/bin/bash</span>
+DATA=$(cat)
+mkdir -p $HOME/.claude/logs
+TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+TOOL=$(echo "$DATA" | jq -r '.tool_name')
+INPUT=$(echo "$DATA" | jq -c '.tool_input')
+echo <span class="str">"{\"ts\":\"$TS\",\"tool\":\"$TOOL\",\"input\":$INPUT}"</span> >> $HOME/.claude/logs/patterns.jsonl</div>
+    </div>
+    <div class="hook-detail" id="hook-stop">
+      <strong>Stop</strong>：Claude 準備結束 session 時觸發（最後一輪 response 送出後）。適合<br>
+      <ul style="margin:10px 0 10px 20px;font-size:13px;line-height:2;color:var(--text2)">
+        <li>💾 <strong>自動存檔</strong>（session 結束 → 更新 MEMORY.md）</li>
+        <li>🔍 <strong>完整性檢查</strong>（確認 TODO 都完成了）</li>
+        <li>📬 <strong>結束通知</strong>（Telegram / Email 告知工作完成）</li>
+      </ul>
+      <div class="code">
+<span class="cmt"># save-session-state.sh</span>
+<span class="kw">#!/bin/bash</span>
+SUMMARY=$(cat)   <span class="cmt"># 接收 Claude 的最終 response</span>
+TIMESTAMP=$(date +%Y%m%d-%H%M)
+echo "$SUMMARY" >> $HOME/.claude/logs/session-$TIMESTAMP.md
+echo <span class="str">"Session saved: $TIMESTAMP"</span></div>
+    </div>
+  </div>
+
+  <!-- Section 2: Exit Code -->
+  <div class="section">
+    <div class="sec-title">Exit Code 控制流</div>
+    <div class="sec-desc">Hook 的 exit code 決定 Claude 接下來的行為。</div>
+    <div class="exit-grid">
+      <div class="exit-card exit-0">
+        <div class="exit-code" style="color:var(--green)">0</div>
+        <div class="exit-name">放行（Continue）</div>
+        <div class="exit-desc">Hook 執行成功，Claude 繼續原本的操作。stdout 的內容會回饋給 Claude 看。</div>
+      </div>
+      <div class="exit-card exit-1">
+        <div class="exit-code" style="color:var(--red)">1</div>
+        <div class="exit-name">阻擋（Block）</div>
+        <div class="exit-desc">Claude 收到 Error，<strong>停止</strong>執行這個工具呼叫。stderr 的內容就是 Error 訊息。</div>
+      </div>
+      <div class="exit-card exit-2">
+        <div class="exit-code" style="color:var(--yellow)">2</div>
+        <div class="exit-name">警告（Non-blocking Error）</div>
+        <div class="exit-desc">Hook 執行失敗，但<strong>不阻擋</strong> Claude 繼續。Claude 可選擇忽略或採取行動。</div>
+      </div>
+    </div>
+    <div class="code" style="margin-top:16px">
+<span class="cmt"># PreToolUse 阻擋危險操作範例</span>
+<span class="kw">#!/bin/bash</span>
+CMD=$(echo "$DATA" | jq -r <span class="str">'.tool_input.command // ""'</span>)
+<span class="kw">if</span> echo "$CMD" | grep -qE <span class="str">'rm -rf|DROP TABLE|git push --force'</span>; then
+  echo <span class="str">"🚫 危險操作被攔截：$CMD"</span> >&2
+  exit <span class="str">1</span>   <span class="cmt"># 阻擋</span>
+<span class="kw">fi</span>
+exit <span class="str">0</span>   <span class="cmt"># 放行</span></div>
+  </div>
+
+  <!-- Section 3: Matcher 測試器 -->
+  <div class="section">
+    <div class="sec-title">Matcher 模式測試器</div>
+    <div class="sec-desc">輸入 matcher 正規表達式和工具名稱，即時測試是否命中。</div>
+    <div class="matcher-box">
+      <div class="matcher-row">
+        <label>Matcher</label>
+        <input id="matcher-pattern" type="text" value="Write|Edit" placeholder="正規表達式，例：Write|Edit" oninput="testMatcher()">
+      </div>
+      <div class="matcher-row">
+        <label>Tool Name</label>
+        <input id="matcher-tool" type="text" value="Write" placeholder="工具名稱，例：Bash" oninput="testMatcher()">
+      </div>
+      <div class="match-result match-yes" id="match-result">✓ 命中</div>
+      <div style="margin-top:16px;font-size:12px;color:var(--text2)">
+        常用 matcher 參考：<code>.*</code>（全部）、<code>Bash</code>（只有 Bash）、<code>Write|Edit</code>（寫檔操作）、<code>Read|Grep|Glob</code>（唯讀操作）
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 4: 實用 Hook 範例 -->
+  <div class="section">
+    <div class="sec-title">10 種實用 Hook 範例</div>
+    <div class="sec-desc">Part 2 完整涵蓋的 Hook 類型。</div>
+    <div class="example-list">
+      <div class="ex-card"><div class="ex-name">Debug Hook</div><span class="ex-type ex-pre">PreToolUse</span><div class="ex-desc">記錄工具呼叫的完整 stdin JSON，方便開發期間除錯。</div></div>
+      <div class="ex-card"><div class="ex-name">通知 Hook</div><span class="ex-type ex-post">PostToolUse</span><div class="ex-desc">Write/Edit 完成後發送 Telegram 通知，讓你知道 AI 完成了什麼。</div></div>
+      <div class="ex-card"><div class="ex-name">格式化 Hook</div><span class="ex-type ex-post">PostToolUse</span><div class="ex-desc">Edit 完成後自動執行 ruff / eslint，確保程式碼風格一致。</div></div>
+      <div class="ex-card"><div class="ex-name">危險操作阻擋</div><span class="ex-type ex-pre">PreToolUse</span><div class="ex-desc">攔截 rm -rf、DROP TABLE、git push --force 等危險操作。</div></div>
+      <div class="ex-card"><div class="ex-name">命令審計</div><span class="ex-type ex-pre">PreToolUse</span><div class="ex-desc">所有 Bash 命令記錄到 audit.log，完整追蹤 AI 執行了什麼。</div></div>
+      <div class="ex-card"><div class="ex-name">MCP 寫入防護</div><span class="ex-type ex-pre">PreToolUse</span><div class="ex-desc">防止 Claude 透過 MCP 工具修改不應修改的資料（如唯讀 DB）。</div></div>
+      <div class="ex-card"><div class="ex-name">Session 狀態保存</div><span class="ex-type ex-stop">Stop</span><div class="ex-desc">Session 結束時自動把進度摘要寫入 MEMORY.md。</div></div>
+      <div class="ex-card"><div class="ex-name">配置審計</div><span class="ex-type ex-post">PostToolUse</span><div class="ex-desc">Write 完 settings.json 後自動驗證 JSON 格式正確性。</div></div>
+      <div class="ex-card"><div class="ex-name">品質閘門</div><span class="ex-type ex-post">PostToolUse</span><div class="ex-desc">程式碼 Edit 後自動跑測試，測試失敗則 exit 1 告知 Claude。</div></div>
+      <div class="ex-card"><div class="ex-name">Prompt Hook</div><span class="ex-type ex-pre">PreToolUse</span><div class="ex-desc">在使用者 prompt 送出前自動注入額外的 context 或指示。</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function showHook(id,btn){
+  document.querySelectorAll('.hook-card').forEach(c=>c.classList.remove('active'));
+  document.querySelectorAll('.hook-detail').forEach(d=>d.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('hook-'+id).classList.add('active');
+}
+function testMatcher(){
+  const pattern=document.getElementById('matcher-pattern').value;
+  const tool=document.getElementById('matcher-tool').value;
+  const el=document.getElementById('match-result');
+  try{
+    const re=new RegExp('^('+pattern+')$');
+    if(re.test(tool)){el.textContent='✓ 命中 — 這個 Hook 會觸發';el.className='match-result match-yes';}
+    else{el.textContent='✗ 不命中 — 這個 Hook 不會觸發';el.className='match-result match-no';}
+  }catch(e){el.textContent='⚠ 無效的正規表達式';el.className='match-result';}
+}
+testMatcher();
+</script>
+</body>
+</html>

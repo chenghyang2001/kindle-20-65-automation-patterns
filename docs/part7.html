@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Part 7 — 進階工作流 | Claude Code Patterns</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg2: #f8fafc;
+    --bg3: #f1f5f9;
+    --border: #e2e8f0;
+    --text: #1e293b;
+    --text2: #64748b;
+    --blue: #2563eb;
+    --blue-light: #eff6ff;
+    --green: #10b981;
+    --green-light: #ecfdf5;
+    --red: #ef4444;
+    --red-light: #fef2f2;
+    --yellow: #f59e0b;
+    --yellow-light: #fffbeb;
+    --purple: #7c3aed;
+    --purple-light: #f5f3ff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+
+  /* Layout */
+  .layout { display: flex; min-height: 100vh; }
+  .sidebar { width: 220px; flex-shrink: 0; background: var(--bg2); border-right: 1px solid var(--border); position: sticky; top: 0; height: 100vh; overflow-y: auto; padding: 16px 0; }
+  .sidebar-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--text2); padding: 0 16px 8px; }
+  .nav-item { display: flex; align-items: center; gap: 8px; padding: 8px 16px; cursor: pointer; border-radius: 0; transition: background 0.15s; text-decoration: none; color: var(--text2); font-size: 13px; }
+  .nav-item:hover { background: var(--bg3); color: var(--text); }
+  .nav-item.active { background: var(--blue-light); color: var(--blue); font-weight: 600; border-right: 3px solid var(--blue); }
+  .nav-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+  .main { flex: 1; max-width: 860px; padding: 40px 48px; }
+
+  /* Header */
+  header { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 20px 48px; }
+  .header-title { font-size: 22px; font-weight: 700; color: var(--text); }
+  .header-sub { color: var(--text2); font-size: 14px; margin-top: 4px; }
+  .sdlc-bar { display: flex; gap: 4px; margin-top: 16px; flex-wrap: wrap; }
+  .sdlc-step { padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; cursor: default; }
+  .sdlc-step.design { background: var(--purple-light); color: var(--purple); }
+  .sdlc-step.check  { background: var(--yellow-light); color: var(--yellow); }
+  .sdlc-step.plan   { background: var(--blue-light); color: var(--blue); }
+  .sdlc-step.impl   { background: var(--green-light); color: var(--green); }
+  .sdlc-step.review { background: var(--bg3); color: var(--text2); }
+  .sdlc-arrow { color: var(--text2); align-self: center; font-size: 12px; }
+
+  /* Section */
+  .section { margin-bottom: 64px; scroll-margin-top: 24px; }
+  .section-header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid var(--border); }
+  .lesson-badge { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; font-size: 13px; font-weight: 700; flex-shrink: 0; }
+  .l1 .lesson-badge { background: var(--red-light); color: var(--red); }
+  .l2 .lesson-badge { background: var(--yellow-light); color: var(--yellow); }
+  .l3 .lesson-badge { background: var(--blue-light); color: var(--blue); }
+  .l4 .lesson-badge { background: var(--green-light); color: var(--green); }
+  .l5 .lesson-badge { background: var(--purple-light); color: var(--purple); }
+  .l6 .lesson-badge { background: var(--bg3); color: var(--text); }
+  .l7 .lesson-badge { background: var(--text); color: var(--bg); }
+  .section-title { font-size: 18px; font-weight: 700; }
+  .section-desc { color: var(--text2); font-size: 14px; margin-top: 2px; }
+
+  /* Cards */
+  .card { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+  .card-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; }
+  .card-title { font-weight: 600; font-size: 14px; }
+  .card-badge { font-size: 11px; padding: 2px 8px; border-radius: 12px; font-weight: 600; }
+  .badge-hard { background: var(--red-light); color: var(--red); }
+  .badge-med  { background: var(--yellow-light); color: var(--yellow); }
+  .badge-easy { background: var(--green-light); color: var(--green); }
+  .card-body { margin-top: 12px; display: none; border-top: 1px solid var(--border); padding-top: 12px; }
+  .card-body.open { display: block; }
+  .card-body p { font-size: 13px; color: var(--text2); line-height: 1.7; }
+  .card-body .example { background: var(--bg3); border-radius: 6px; padding: 10px 12px; margin-top: 8px; font-size: 12px; font-family: monospace; color: var(--text); }
+  .toggle-icon { font-size: 16px; color: var(--text2); transition: transform 0.2s; }
+  .toggle-icon.open { transform: rotate(180deg); }
+
+  /* Checklist */
+  .checklist { list-style: none; }
+  .checklist li { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .checklist li:last-child { border-bottom: none; }
+  .checklist input[type=checkbox] { width: 18px; height: 18px; margin-top: 2px; cursor: pointer; flex-shrink: 0; accent-color: var(--blue); }
+  .checklist label { font-size: 14px; cursor: pointer; flex: 1; }
+  .checklist label .desc { display: block; font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .score-bar { margin-top: 16px; padding: 14px 16px; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; background: var(--bg3); transition: background 0.3s; }
+  .score-text { font-size: 15px; font-weight: 700; }
+  .score-verdict { font-size: 13px; font-weight: 600; padding: 4px 12px; border-radius: 20px; }
+  .score-verdict.pass { background: var(--green-light); color: var(--green); }
+  .score-verdict.fail { background: var(--red-light); color: var(--red); }
+
+  /* Flow selector */
+  .flow-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .flow-tab { padding: 8px 16px; border: 2px solid var(--border); border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; background: var(--bg); transition: all 0.15s; }
+  .flow-tab:hover { border-color: var(--blue); color: var(--blue); }
+  .flow-tab.active { background: var(--blue); border-color: var(--blue); color: white; }
+  .flow-content { display: none; }
+  .flow-content.active { display: block; }
+  .flow-steps { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .flow-step { display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: var(--bg3); border-radius: 20px; font-size: 12px; font-weight: 500; }
+  .flow-step .arrow { color: var(--text2); }
+
+  /* Stepper */
+  .stepper { display: flex; justify-content: space-between; margin-bottom: 20px; }
+  .stage-dot { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s; border: 2px solid var(--border); background: var(--bg); color: var(--text2); }
+  .stage-dot.done { background: var(--green); border-color: var(--green); color: white; }
+  .stage-dot.active { background: var(--blue); border-color: var(--blue); color: white; box-shadow: 0 0 0 4px var(--blue-light); }
+  .stage-connector { flex: 1; height: 2px; background: var(--border); align-self: center; margin: 0 4px; transition: background 0.3s; }
+  .stage-connector.done { background: var(--green); }
+  .stage-card { background: var(--blue-light); border: 1px solid var(--blue); border-radius: 8px; padding: 16px 20px; }
+  .stage-name { font-weight: 700; color: var(--blue); font-size: 16px; }
+  .stage-rule { margin-top: 8px; font-size: 13px; color: var(--text2); }
+  .stage-rule strong { color: var(--text); }
+  .stage-nav { display: flex; gap: 8px; margin-top: 16px; }
+  .btn { padding: 8px 20px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); cursor: pointer; font-size: 13px; font-weight: 600; transition: all 0.15s; }
+  .btn:hover { background: var(--bg3); }
+  .btn.primary { background: var(--blue); color: white; border-color: var(--blue); }
+  .btn.primary:hover { background: #1d4ed8; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Comparison table */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 16px; }
+  th { text-align: left; padding: 10px 12px; background: var(--bg3); border: 1px solid var(--border); font-weight: 600; }
+  td { padding: 10px 12px; border: 1px solid var(--border); }
+  tr:nth-child(even) td { background: var(--bg2); }
+  .cell-good { color: var(--green); font-weight: 600; }
+  .cell-bad  { color: var(--red); font-weight: 600; }
+
+  /* Worktree diagram */
+  .worktree-diagram { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
+  .wt-main { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .wt-box { padding: 10px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; border: 2px solid; }
+  .wt-main-box { background: var(--text); color: white; border-color: var(--text); }
+  .wt-workers { display: flex; gap: 12px; flex-wrap: wrap; }
+  .wt-worker { flex: 1; min-width: 180px; border: 2px solid var(--border); border-radius: 8px; padding: 12px; }
+  .wt-worker-title { font-weight: 700; font-size: 13px; margin-bottom: 8px; }
+  .wt-worker-model { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; margin-bottom: 6px; }
+  .model-opus   { background: var(--purple-light); color: var(--purple); }
+  .model-sonnet { background: var(--blue-light); color: var(--blue); }
+  .model-haiku  { background: var(--green-light); color: var(--green); }
+  .wt-worker p  { font-size: 12px; color: var(--text2); }
+  .wt-arrow { color: var(--text2); font-size: 20px; }
+
+  /* Log animation */
+  .log-box { background: #0f172a; border-radius: 8px; padding: 16px; font-family: monospace; font-size: 12px; min-height: 120px; max-height: 200px; overflow-y: auto; }
+  .log-line { color: #94a3b8; line-height: 1.8; opacity: 0; transition: opacity 0.4s; }
+  .log-line.visible { opacity: 1; }
+  .log-line .ts  { color: #64748b; }
+  .log-line .key { color: #60a5fa; }
+  .log-line .val { color: #86efac; }
+  .log-btn { margin-top: 8px; }
+
+  /* Slider */
+  .slider-container { padding: 16px; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; }
+  .slider-label { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; }
+  input[type=range] { width: 100%; accent-color: var(--blue); }
+  .slider-result { margin-top: 12px; padding: 10px 14px; border-radius: 6px; font-size: 14px; font-weight: 600; text-align: center; }
+  .result-skill     { background: var(--green-light); color: var(--green); }
+  .result-watch     { background: var(--yellow-light); color: var(--yellow); }
+  .result-discard   { background: var(--red-light); color: var(--red); }
+
+  /* Directory tree */
+  .dir-tree { font-family: monospace; font-size: 13px; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+  .dir-item { cursor: pointer; user-select: none; padding: 2px 0; }
+  .dir-item:hover { color: var(--blue); }
+  .dir-item .icon { margin-right: 4px; }
+  .dir-content { display: none; padding-left: 20px; }
+  .dir-content.open { display: block; }
+  .code-block { background: #0f172a; color: #e2e8f0; border-radius: 6px; padding: 12px; font-size: 12px; font-family: monospace; margin-top: 8px; white-space: pre-wrap; display: none; }
+  .code-block.open { display: block; }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .sidebar { display: none; }
+    .main { padding: 24px 20px; }
+    header { padding: 16px 20px; }
+    .stepper { gap: 4px; }
+    .stage-dot { width: 24px; height: 24px; font-size: 10px; }
+  }
+
+  .top-nav{background:var(--text);padding:0 32px;display:flex;align-items:center;gap:24px;height:52px;position:sticky;top:0;z-index:200;}
+  .nav-brand{color:#fff;font-weight:700;font-size:15px;text-decoration:none;}
+  .nav-links{display:flex;gap:4px;flex-wrap:wrap;}
+  .nav-links a{color:#94a3b8;font-size:12px;padding:4px 8px;border-radius:4px;text-decoration:none;}
+  .nav-links a:hover,.nav-links a.active{color:#fff;background:rgba(255,255,255,0.15);}
+  .sidebar{top:52px;height:calc(100vh - 52px);}
+</style>
+</head>
+<body>
+<nav class="top-nav">
+  <a href="index.html" class="nav-brand">Claude Code Patterns</a>
+  <div class="nav-links">
+    <a href="part1.html">P1 設計基礎</a>
+    <a href="part2.html">P2 Hooks</a>
+    <a href="part3.html">P3 Sub-agents</a>
+    <a href="part4.html">P4 CI/CD</a>
+    <a href="part5.html">P5 安全</a>
+    <a href="part6.html">P6 成本</a>
+    <a href="part7.html" class="active">P7 工作流</a>
+  </div>
+</nav>
+
+<header>
+  <div class="header-title">Part 7 — 進階工作流 互動學習</div>
+  <div class="header-sub">七個工具 × 七個防線 — 從幻覺偵測到 Plugin 封裝的完整 SDLC</div>
+  <div class="sdlc-bar">
+    <span class="sdlc-step design">L3 動態編排</span>
+    <span class="sdlc-arrow">→</span>
+    <span class="sdlc-step check">L1 幻覺偵測</span>
+    <span class="sdlc-arrow">→</span>
+    <span class="sdlc-step check">L2 信心檢查</span>
+    <span class="sdlc-arrow">→</span>
+    <span class="sdlc-step plan">L4 七階段工作流</span>
+    <span class="sdlc-arrow">→</span>
+    <span class="sdlc-step impl">L5 多 Agent Worktree</span>
+    <span class="sdlc-arrow">→</span>
+    <span class="sdlc-step review">L6 觀察 Hook</span>
+    <span class="sdlc-arrow">→</span>
+    <span class="sdlc-step review">L7 Plugin 封裝</span>
+  </div>
+</header>
+
+<div class="layout">
+  <nav class="sidebar">
+    <div class="sidebar-title">課次</div>
+    <a class="nav-item active" href="#l1" onclick="setActive(this)"><span class="nav-dot"></span>L1 幻覺偵測</a>
+    <a class="nav-item" href="#l2" onclick="setActive(this)"><span class="nav-dot"></span>L2 信心檢查</a>
+    <a class="nav-item" href="#l3" onclick="setActive(this)"><span class="nav-dot"></span>L3 動態編排</a>
+    <a class="nav-item" href="#l4" onclick="setActive(this)"><span class="nav-dot"></span>L4 七階段工作流</a>
+    <a class="nav-item" href="#l5" onclick="setActive(this)"><span class="nav-dot"></span>L5 多 Agent Worktree</a>
+    <a class="nav-item" href="#l6" onclick="setActive(this)"><span class="nav-dot"></span>L6 觀察 Hook</a>
+    <a class="nav-item" href="#l7" onclick="setActive(this)"><span class="nav-dot"></span>L7 Plugin 封裝</a>
+  </nav>
+
+  <main class="main">
+
+    <!-- L1: 幻覺偵測 -->
+    <section class="section l1" id="l1">
+      <div class="section-header">
+        <span class="lesson-badge">1</span>
+        <div>
+          <div class="section-title">幻覺偵測</div>
+          <div class="section-desc">7 種幻覺類型 + 4 個驗證問題。點擊卡片展開詳情。</div>
+        </div>
+      </div>
+
+      <div id="rf-cards"></div>
+
+      <div class="card" style="margin-top:20px; background: var(--yellow-light); border-color: var(--yellow);">
+        <div class="card-title" style="color: var(--yellow); margin-bottom: 8px;">4 個必問驗證問題</div>
+        <ol style="padding-left: 20px; font-size: 13px; color: var(--text); line-height: 2;">
+          <li>這個 API / 函式你是在哪個版本的官方文件看到的？</li>
+          <li>能告訴我這個功能所在的確切檔案路徑嗎？</li>
+          <li>這個行為你有實際測試確認過嗎，還是從訓練資料推斷？</li>
+          <li>如果我現在照你說的步驟做，最可能遇到什麼錯誤？</li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- L2: 信心檢查 -->
+    <section class="section l2" id="l2">
+      <div class="section-header">
+        <span class="lesson-badge">2</span>
+        <div>
+          <div class="section-title">實作前信心清單</div>
+          <div class="section-desc">勾選 C1–C5，達到 ≥4/5 才能動手。這就是 /confidence-check 的核心邏輯。</div>
+        </div>
+      </div>
+
+      <ul class="checklist" id="confidence-list">
+        <li>
+          <input type="checkbox" id="c1" onchange="updateScore()">
+          <label for="c1">
+            <strong>C1 — 不重複造輪子</strong>
+            <span class="desc">已確認現有程式庫沒有類似功能（grep -r 搜過）</span>
+          </label>
+        </li>
+        <li>
+          <input type="checkbox" id="c2" onchange="updateScore()">
+          <label for="c2">
+            <strong>C2 — 架構合規</strong>
+            <span class="desc">新功能符合現有分層架構，沒有跨層直接呼叫</span>
+          </label>
+        </li>
+        <li>
+          <input type="checkbox" id="c3" onchange="updateScore()">
+          <label for="c3">
+            <strong>C3 — 官方文件佐證</strong>
+            <span class="desc">涉及外部 API 時，已查閱官方文件確認用法正確</span>
+          </label>
+        </li>
+        <li>
+          <input type="checkbox" id="c4" onchange="updateScore()">
+          <label for="c4">
+            <strong>C4 — OSS 參考</strong>
+            <span class="desc">已搜尋類似開源實作，了解業界慣例做法</span>
+          </label>
+        </li>
+        <li>
+          <input type="checkbox" id="c5" onchange="updateScore()">
+          <label for="c5">
+            <strong>C5 — 根本原因確認</strong>
+            <span class="desc">需求背後的真正問題已釐清，不是在解決表面症狀</span>
+          </label>
+        </li>
+      </ul>
+
+      <div class="score-bar" id="score-bar">
+        <span class="score-text" id="score-text">0 / 5 項通過</span>
+        <span class="score-verdict fail" id="score-verdict">需要補充</span>
+      </div>
+    </section>
+
+    <!-- L3: 動態編排 -->
+    <section class="section l3" id="l3">
+      <div class="section-header">
+        <span class="lesson-badge">3</span>
+        <div>
+          <div class="section-title">動態編排 /orchestrate</div>
+          <div class="section-desc">依任務類型選擇對應的工作流路徑。</div>
+        </div>
+      </div>
+
+      <div class="flow-tabs">
+        <button class="flow-tab active" onclick="selectFlow('bugfix', this)">bugfix</button>
+        <button class="flow-tab" onclick="selectFlow('feature', this)">feature</button>
+        <button class="flow-tab" onclick="selectFlow('refactor', this)">refactor</button>
+        <button class="flow-tab" onclick="selectFlow('security', this)">security</button>
+      </div>
+
+      <div class="flow-content active" id="flow-bugfix">
+        <div class="card">
+          <div class="card-title" style="color:var(--red)">🐛 Bug Fix 流程</div>
+          <div class="flow-steps" style="margin-top:12px">
+            <span class="flow-step">L1 幻覺偵測</span>
+            <span class="flow-step arrow">→</span>
+            <span class="flow-step">L2 信心檢查</span>
+            <span class="flow-step arrow">→</span>
+            <span class="flow-step">S4 Sub-agent 探索根因</span>
+            <span class="flow-step arrow">→</span>
+            <span class="flow-step">S5 TDD 修復</span>
+            <span class="flow-step arrow">→</span>
+            <span class="flow-step">S6 審查</span>
+            <span class="flow-step arrow">→</span>
+            <span class="flow-step">S7 Commit</span>
+          </div>
+          <p style="font-size:13px;color:var(--text2);margin-top:12px">⚡ 特點：跳過 S1 腦力激盪，因為問題已知；L1 優先排除「AI 幻覺診斷」的干擾</p>
+        </div>
+      </div>
+
+      <div class="flow-content" id="flow-feature">
+        <div class="card">
+          <div class="card-title" style="color:var(--blue)">✨ New Feature 流程</div>
+          <div class="flow-steps" style="margin-top:12px">
+            <span class="flow-step">S1 腦力激盪</span>
+            <span class="flow-step arrow">→</span>
+            <span class="flow-step">L2 信心檢查</span>
+            <span class="flow-step arrow">→</span>
+            <span class="flow-step">L3 動態編排</span>
+            <span class="flow-step arrow">→</span>
+            <span class="flow-step">S2 Worktree</span>
+            <span class="flow-step arrow">→</span>
+            <span class="flow-step">S4 探索</span>
+            <span class="flow-step arrow">→</span>
+            <span class="flow-step">S5 TDD</span>
+            <span class="flow-step arrow">→</span>
+            <span class="flow-step">S6+S7</span>
+          </div>
+          <p style="font-size:13px;color:var(--text2);margin-top:12px">⚡ 特點：完整 7 階段，S2 Worktree 隔離避免污染主線</p>
+        </div>
+      </div>
+
+      <div class="flow-content" id="flow-refactor">
+        <div class="card">
+          <div class="card-title" style="color:var(--purple)">🔧 Refactor 流程</div>
+          <div class="flow-steps" style="margin-top:12px">
+            <span class="flow-step">L6 分析歷史模式</span>
+            <span class="flow-step arrow">→</span>
+            <span class="flow-step">L2 信心檢查（C2+C5）</span>
+            <span class="flow-step arrow">→</span>
+            <span class="flow-step">S2 Worktree</span>
+            <span class="flow-step arrow">→</span>
+            <span class="flow-step">L5 Multi-agent</span>
+            <span class="flow-step arrow">→</span>
+            <span class="flow-step">S6 審查</span>
+          </div>
+          <p style="font-size:13px;color:var(--text2);margin-top:12px">⚡ 特點：L6 先看歷史日誌了解現有模式；L5 多 worktree 並行審查不同面向</p>
+        </div>
+      </div>
+
+      <div class="flow-content" id="flow-security">
+        <div class="card">
+          <div class="card-title" style="color:var(--red)">🔒 Security 流程</div>
+          <div class="flow-steps" style="margin-top:12px">
+            <span class="flow-step">L1 幻覺偵測（優先）</span>
+            <span class="flow-step arrow">→</span>
+            <span class="flow-step">L2 全項通過（5/5）</span>
+            <span class="flow-step arrow">→</span>
+            <span class="flow-step">S2 獨立 Worktree</span>
+            <span class="flow-step arrow">→</span>
+            <span class="flow-step">L7 Plugin 封裝結果</span>
+          </div>
+          <p style="font-size:13px;color:var(--text2);margin-top:12px">⚡ 特點：L2 門檻升至 5/5（全通過）；安全修補不允許任何不確定性</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- L4: 七階段工作流 -->
+    <section class="section l4" id="l4">
+      <div class="section-header">
+        <span class="lesson-badge">4</span>
+        <div>
+          <div class="section-title">七階段工作流 + Checkpoint</div>
+          <div class="section-desc">點擊圓點或按鈕逐步走完 S1–S7。每個階段都有前置條件。</div>
+        </div>
+      </div>
+
+      <div class="stepper" id="stepper"></div>
+
+      <div class="stage-card" id="stage-card">
+        <div class="stage-name" id="stage-name"></div>
+        <div class="stage-rule" id="stage-rule"></div>
+      </div>
+
+      <div class="stage-nav">
+        <button class="btn" id="btn-prev" onclick="prevStage()" disabled>← 上一步</button>
+        <button class="btn primary" id="btn-next" onclick="nextStage()">下一步 →</button>
+      </div>
+
+      <div style="margin-top: 32px;">
+        <div class="section-title" style="font-size:15px; margin-bottom:12px">Checkpoint vs Git Stash 對照</div>
+        <table>
+          <tr><th>保護工具</th><th>保護範圍</th><th>盲點</th><th>何時用</th></tr>
+          <tr>
+            <td><strong>Checkpoint</strong> (Esc+Esc)</td>
+            <td class="cell-good">Claude Write/Edit 工具操作</td>
+            <td class="cell-bad">bash 指令不追蹤</td>
+            <td>AI 工具改錯、想回到對話時間點</td>
+          </tr>
+          <tr>
+            <td><strong>Git Stash</strong></td>
+            <td class="cell-good">所有未 commit 的磁碟變更</td>
+            <td class="cell-bad">需手動觸發</td>
+            <td>執行 npm install / rm -rf 之前</td>
+          </tr>
+        </table>
+      </div>
+    </section>
+
+    <!-- L5: 多 Agent Worktree -->
+    <section class="section l5" id="l5">
+      <div class="section-header">
+        <span class="lesson-badge">5</span>
+        <div>
+          <div class="section-title">多 Agent Worktree — 三角色分工</div>
+          <div class="section-desc">一鍵展開三個獨立戰場，主線 main 完全不受影響。</div>
+        </div>
+      </div>
+
+      <div class="worktree-diagram">
+        <div class="wt-main">
+          <div class="wt-box wt-main-box">main 分支</div>
+          <div class="wt-arrow">→ cascade-start.sh demo-task</div>
+        </div>
+        <div class="wt-workers">
+          <div class="wt-worker">
+            <div class="wt-worker-title">Worker 1 — 架構師</div>
+            <span class="wt-worker-model model-opus">Opus — 最強推理</span>
+            <p>Plan Mode 鎖定，禁止 Write/Edit<br>負責：S1 腦力激盪 + S3 規劃<br>Branch: demo-task-worker-1-{ts}</p>
+          </div>
+          <div class="wt-worker">
+            <div class="wt-worker-title">Worker 2 — 實作者</div>
+            <span class="wt-worker-model model-sonnet">Sonnet — 成本/能力平衡</span>
+            <p>完整讀寫權限<br>負責：S4 探索 + S5 TDD<br>Branch: demo-task-worker-2-{ts}</p>
+          </div>
+          <div class="wt-worker">
+            <div class="wt-worker-title">Worker 3 — 驗證者</div>
+            <span class="wt-worker-model model-haiku">Haiku — 快且便宜</span>
+            <p>唯讀 + 執行測試<br>負責：S6 審查<br>Branch: demo-task-worker-3-{ts}</p>
+          </div>
+        </div>
+        <div style="margin-top:16px; padding: 10px 14px; background: var(--yellow-light); border-radius: 6px; font-size: 12px; color: var(--yellow);">
+          <strong>為什麼用 Worktree 而非新 Branch？</strong> Branch 只是 git 指標切換，仍共享同一實體工作目錄；三個 Claude 實例會互相蓋掉彼此的檔案。Worktree 是獨立實體資料夾，互不干擾。
+        </div>
+      </div>
+
+      <div style="margin-top:16px">
+        <div style="font-size:13px;color:var(--text2);font-family:monospace;background:var(--bg3);padding:12px;border-radius:6px">
+          <div style="color:var(--text2)"># 建立三個 worktree</div>
+          <div>bash cascade-start.sh <span style="color:var(--blue)">demo-task</span></div>
+          <div style="margin-top:8px;color:var(--text2)"># 清理</div>
+          <div>git worktree remove ../work-demo-task-{1,2,3}</div>
+          <div>git worktree prune</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- L6: 觀察 Hook + 自我進化 -->
+    <section class="section l6" id="l6">
+      <div class="section-header">
+        <span class="lesson-badge">6</span>
+        <div>
+          <div class="section-title">觀察 Hook + 自我進化</div>
+          <div class="section-desc">PostToolUse Hook 把每次工具操作寫入 JSONL，再用 /analyze-patterns 分析信心分數。</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">日誌模擬 — patterns.jsonl</div>
+        <div class="log-box" id="log-box" style="margin-top:12px"></div>
+        <button class="btn log-btn" onclick="startLog()">▶ 播放日誌動畫</button>
+      </div>
+
+      <div class="slider-container" style="margin-top:16px">
+        <div class="slider-label">
+          <span style="font-weight:600">信心分數：<span id="conf-val">55</span>%</span>
+          <span style="color:var(--text2);font-size:12px">（出現次數 / 總操作數 × 100）</span>
+        </div>
+        <input type="range" min="0" max="100" value="55" oninput="updateConfidence(this.value)">
+        <div class="slider-result" id="conf-result"></div>
+      </div>
+
+      <div style="margin-top:16px">
+        <table>
+          <tr><th>信心分數</th><th>行動</th><th>理由</th></tr>
+          <tr><td class="cell-good">≥ 70%</td><td><strong>Skill 候選</strong></td><td>真正的工作習慣，值得制度化</td></tr>
+          <tr><td style="color:var(--yellow);font-weight:600">40–69%</td><td><strong>持續觀察</strong></td><td>模式尚不穩定</td></tr>
+          <tr><td class="cell-bad">&lt; 40%</td><td><strong>不列入候選</strong></td><td>偶發操作或雜訊</td></tr>
+        </table>
+      </div>
+    </section>
+
+    <!-- L7: Plugin 封裝 -->
+    <section class="section l7" id="l7">
+      <div class="section-header">
+        <span class="lesson-badge">7</span>
+        <div>
+          <div class="section-title">Plugin 封裝 — 消滅部落知識</div>
+          <div class="section-desc">點擊目錄樹展開各元件的內容。${CLAUDE_PLUGIN_ROOT} 讓路徑跨機器可攜。</div>
+        </div>
+      </div>
+
+      <div class="dir-tree" id="dir-tree"></div>
+
+      <div style="margin-top:20px">
+        <table>
+          <tr><th>元件</th><th>功能</th><th>類比</th></tr>
+          <tr><td><code>plugin.json</code></td><td>Plugin 身分證（name/version/author）</td><td>npm 的 package.json</td></tr>
+          <tr><td><code>hooks.json</code></td><td>宣告 Plugin 附帶的 Hook 設定</td><td>服務的配置文件</td></tr>
+          <tr><td><code>skills/</code></td><td>Plugin 內附的 Skill 集合</td><td>函式庫的模組目錄</td></tr>
+          <tr><td><code>install-skill.sh</code></td><td>從 GitHub 安裝單一 Skill</td><td>pip install / npm install</td></tr>
+          <tr><td><code>${CLAUDE_PLUGIN_ROOT}</code></td><td>Hook 路徑不硬編碼，跨機器可攜</td><td>Python 的 Path.home()</td></tr>
+        </table>
+      </div>
+
+      <div class="card" style="margin-top:20px; background: var(--green-light); border-color: var(--green);">
+        <div class="card-title" style="color:var(--green)">Part 7 完整迴路</div>
+        <div style="margin-top:12px;font-size:13px;font-family:monospace;line-height:2.2">
+          L1 偵測幻覺 → L2 信心門檻 → L3 選對流程<br>
+          → L4 七階段保護 → L5 多 Agent 並行<br>
+          → L6 自動記錄學習 → L7 封裝分享給團隊
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+// ─── L1: RF Card 資料 ───────────────────────────────────────────────────────
+const rfData = [
+  {
+    id: 'RF1',
+    name: '幻覺函式（Hallucinated API）',
+    desc: 'AI 捏造出看起來合理但根本不存在的函式或方法名稱。',
+    example: '// AI 給的（不存在）\nfs.readFileSync.withEncoding("utf-8", path)\n// 正確寫法\nfs.readFileSync(path, "utf-8")',
+    difficulty: 'med',
+    diffLabel: '中等難識別'
+  },
+  {
+    id: 'RF2',
+    name: '版本穿越（Version Time Travel）',
+    desc: 'AI 使用的是舊版或未來版本的 API，與你當前安裝版本不符。',
+    example: '# AI 說的（v4 語法）\nfrom langchain import OpenAI\n# 現在正確（v0.2+）\nfrom langchain_openai import OpenAI',
+    difficulty: 'hard',
+    diffLabel: '難識別'
+  },
+  {
+    id: 'RF3',
+    name: '信心過剩（Overconfident Assertion）',
+    desc: 'AI 以極度確定的語氣描述一個不確定的事實，不表達任何懷疑。',
+    example: '"這個函式保證執行緒安全"\n（事實：標準函式庫文件沒有此保證）',
+    difficulty: 'hard',
+    diffLabel: '最難識別'
+  },
+  {
+    id: 'RF4',
+    name: '隱形假設（Hidden Assumption）',
+    desc: 'AI 的答案隱含了一個未說出的前提，但這個前提在你的環境中不成立。',
+    example: '"只需要 npm install 就能跑"\n（隱含假設：Node.js 版本 ≥ 18，但你是 v14）',
+    difficulty: 'hard',
+    diffLabel: '最難識別'
+  },
+  {
+    id: 'RF5',
+    name: '權重崩潰（Training Cutoff Artifact）',
+    desc: '訓練資料截止日後的重大版本更新、棄用、或安全漏洞被 AI 忽略。',
+    example: '// AI 推薦（已棄用）\nrequire("request").get(url, cb)\n// 現在應該用 fetch 或 axios',
+    difficulty: 'med',
+    diffLabel: '中等難識別'
+  },
+  {
+    id: 'RF6',
+    name: '反向確認（Confirmation Bias Output）',
+    desc: 'AI 傾向給出使用者想聽到的答案，而非正確答案。',
+    example: '使用者：「這個設計應該沒問題吧？」\nAI：「是的，這個設計很好！」\n（即使設計有明顯問題）',
+    difficulty: 'easy',
+    diffLabel: '易識別'
+  },
+  {
+    id: 'RF7',
+    name: '遞迴幻覺（Cascading Hallucination）',
+    desc: '第一個幻覺引發連鎖反應，後續內容全部建立在虛假前提上。',
+    example: 'AI 說：「呼叫 A 函式後需要等待 B 事件」\n（A 函式不存在 → B 事件的描述也全部虛假）',
+    difficulty: 'hard',
+    diffLabel: '最難識別'
+  }
+];
+
+function buildRFCards() {
+  const container = document.getElementById('rf-cards');
+  rfData.forEach(rf => {
+    const diffClass = rf.difficulty === 'hard' ? 'badge-hard' : rf.difficulty === 'med' ? 'badge-med' : 'badge-easy';
+    container.innerHTML += `
+      <div class="card">
+        <div class="card-header" onclick="toggleCard('${rf.id}')">
+          <div class="card-title">${rf.id} — ${rf.name}</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="card-badge ${diffClass}">${rf.diffLabel}</span>
+            <span class="toggle-icon" id="icon-${rf.id}">▼</span>
+          </div>
+        </div>
+        <div class="card-body" id="body-${rf.id}">
+          <p>${rf.desc}</p>
+          <div class="example">${rf.example}</div>
+        </div>
+      </div>`;
+  });
+}
+
+function toggleCard(id) {
+  const body = document.getElementById('body-' + id);
+  const icon = document.getElementById('icon-' + id);
+  body.classList.toggle('open');
+  icon.classList.toggle('open');
+}
+
+// ─── L2: 信心分數計算 ────────────────────────────────────────────────────────
+function updateScore() {
+  const checkboxes = document.querySelectorAll('#confidence-list input[type=checkbox]');
+  let count = 0;
+  checkboxes.forEach(cb => { if (cb.checked) count++; });
+  const scoreText = document.getElementById('score-text');
+  const verdict = document.getElementById('score-verdict');
+  const bar = document.getElementById('score-bar');
+  scoreText.textContent = count + ' / 5 項通過';
+  if (count >= 4) {
+    verdict.textContent = '✓ 可以動手';
+    verdict.className = 'score-verdict pass';
+    bar.style.background = 'var(--green-light)';
+  } else {
+    verdict.textContent = count >= 2 ? '還需補充 ' + (4 - count) + ' 項' : '需要補充';
+    verdict.className = 'score-verdict fail';
+    bar.style.background = 'var(--bg3)';
+  }
+}
+
+// ─── L3: Flow 選擇器 ─────────────────────────────────────────────────────────
+function selectFlow(type, btn) {
+  document.querySelectorAll('.flow-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.flow-content').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('flow-' + type).classList.add('active');
+}
+
+// ─── L4: 七階段 Stepper ──────────────────────────────────────────────────────
+const stages = [
+  { name: 'S1 腦力激盪', rule: '<strong>核心限制：</strong>只輸出純文字（任務定義 + 完成標準 + 範圍外）。<strong>禁止寫任何程式碼。</strong>先確定「要做什麼」，才能決定「怎麼做」。' },
+  { name: 'S2 建立 Worktree', rule: '<strong>核心動作：</strong><code>git worktree add ../work-{task}-{ts} -b feature/{task}</code><br>所有工作都在這個 worktree 中進行，主線 main 完全隔離。' },
+  { name: 'S3 規劃', rule: '<strong>前置條件：</strong>執行 /confidence-check，C1–C5 <strong>≥ 4/5（≥80%）才能進入下一階段</strong>。未達標直接停下來補充資訊。' },
+  { name: 'S4 Sub-agent 探索', rule: '<strong>核心動作：</strong>把探索任務委派給 Explore agent（Haiku 模型），不讓主 context 被大量讀檔塞爆。主 agent 只看摘要。' },
+  { name: 'S5 TDD 實作', rule: '<strong>鐵律：</strong>先寫測試，再實作。測試紅燈 → 實作 → 測試綠燈。<strong>不允許「寫完再補測試」</strong>。' },
+  { name: 'S6 審查', rule: '<strong>前置條件：</strong>執行 /review，<strong>解決所有被提出的問題</strong>，不允許跳過或標記 "known issue"。' },
+  { name: 'S7 完成', rule: '<strong>收尾動作：</strong>git commit → git worktree remove → git worktree prune → 執行 /session-end 更新記憶。' }
+];
+let currentStage = 0;
+
+function buildStepper() {
+  const stepper = document.getElementById('stepper');
+  stepper.innerHTML = '';
+  stages.forEach((s, i) => {
+    if (i > 0) {
+      const conn = document.createElement('div');
+      conn.className = 'stage-connector' + (i <= currentStage ? ' done' : '');
+      conn.id = 'conn-' + i;
+      stepper.appendChild(conn);
+    }
+    const dot = document.createElement('div');
+    dot.className = 'stage-dot' + (i < currentStage ? ' done' : i === currentStage ? ' active' : '');
+    dot.textContent = i < currentStage ? '✓' : (i + 1);
+    dot.onclick = () => goToStage(i);
+    dot.title = s.name;
+    stepper.appendChild(dot);
+  });
+  document.getElementById('stage-name').textContent = stages[currentStage].name;
+  document.getElementById('stage-rule').innerHTML = stages[currentStage].rule;
+  document.getElementById('btn-prev').disabled = currentStage === 0;
+  document.getElementById('btn-next').disabled = currentStage === stages.length - 1;
+  document.getElementById('btn-next').textContent = currentStage === stages.length - 2 ? '完成 ✓' : '下一步 →';
+}
+
+function goToStage(i) { currentStage = i; buildStepper(); }
+function nextStage() { if (currentStage < stages.length - 1) { currentStage++; buildStepper(); } }
+function prevStage() { if (currentStage > 0) { currentStage--; buildStepper(); } }
+
+// ─── L6: 日誌動畫 ───────────────────────────────────────────────────────────
+const logLines = [
+  '{"ts":"2026-06-15T08:21:03Z","tool":"<span class=key>Read</span>","input":{"file_path":"<span class=val>/src/auth.ts</span>"}}',
+  '{"ts":"2026-06-15T08:21:09Z","tool":"<span class=key>Grep</span>","input":{"pattern":"<span class=val>authenticate</span>"}}',
+  '{"ts":"2026-06-15T08:21:15Z","tool":"<span class=key>Edit</span>","input":{"file_path":"<span class=val>/src/auth.ts</span>","lines":3}}',
+  '{"ts":"2026-06-15T08:21:22Z","tool":"<span class=key>Bash</span>","input":{"command":"<span class=val>npm test</span>"}}',
+  '{"ts":"2026-06-15T08:21:30Z","tool":"<span class=key>Bash</span>","input":{"command":"<span class=val>git add -A && git commit</span>"}}',
+  '{"ts":"2026-06-15T08:22:01Z","tool":"<span class=key>Read</span>","input":{"file_path":"<span class=val>/src/user.ts</span>"}}',
+  '{"ts":"2026-06-15T08:22:08Z","tool":"<span class=key>Grep</span>","input":{"pattern":"<span class=val>getUser</span>"}}',
+];
+
+function startLog() {
+  const box = document.getElementById('log-box');
+  box.innerHTML = '';
+  logLines.forEach((line, i) => {
+    const el = document.createElement('div');
+    el.className = 'log-line';
+    el.innerHTML = line;
+    box.appendChild(el);
+    setTimeout(() => { el.classList.add('visible'); box.scrollTop = box.scrollHeight; }, i * 800);
+  });
+}
+
+function updateConfidence(val) {
+  document.getElementById('conf-val').textContent = val;
+  const result = document.getElementById('conf-result');
+  val = parseInt(val);
+  if (val >= 70) {
+    result.textContent = '✓ Skill 候選 — 值得正式建立成 Skill';
+    result.className = 'slider-result result-skill';
+  } else if (val >= 40) {
+    result.textContent = '◉ 持續觀察 — 模式尚不穩定，繼續積累資料';
+    result.className = 'slider-result result-watch';
+  } else {
+    result.textContent = '✕ 不列入候選 — 偶發操作或雜訊';
+    result.className = 'slider-result result-discard';
+  }
+}
+
+// ─── L7: 目錄樹 ─────────────────────────────────────────────────────────────
+const treeData = {
+  name: 'my-workflow-plugin/',
+  children: [
+    {
+      name: '.claude-plugin/',
+      children: [{
+        name: 'plugin.json',
+        code: `{
+  "name": "my-workflow-plugin",
+  "version": "1.0.0",
+  "description": "7 階段工作流：confidence-check + orchestrate + 觀察 Hook",
+  "author": { "name": "Peter Yang" },
+  "license": "MIT"
+}`
+      }]
+    },
+    {
+      name: 'hooks/',
+      children: [{
+        name: 'hooks.json',
+        code: `{
+  "hooks": {
+    "PostToolUse": [{
+      "matcher": ".*",
+      "hooks": [{
+        "type": "command",
+        "command": "\${CLAUDE_PLUGIN_ROOT}/hooks/observe-pattern.sh"
+      }]
+    }]
+  }
+}`
+      }]
+    },
+    {
+      name: 'skills/',
+      children: [
+        { name: 'confidence-check/', children: [{ name: 'SKILL.md', code: '# confidence-check Skill\n\n觸發：/confidence-check\n功能：執行 C1–C5 五項檢查，≥4/5 才允許進入實作階段。' }] },
+        { name: 'orchestrate/', children: [{ name: 'SKILL.md', code: '# orchestrate Skill\n\n觸發：/orchestrate {task-type}\n功能：依 bugfix/feature/refactor/security 選擇對應工作流路徑。' }] }
+      ]
+    }
+  ]
+};
+
+function buildTree(node, container) {
+  const isFile = !node.children;
+  const item = document.createElement('div');
+  item.className = 'dir-item';
+  item.innerHTML = `<span class="icon">${isFile ? '📄' : '📁'}</span>${node.name}`;
+  container.appendChild(item);
+
+  if (node.children) {
+    const content = document.createElement('div');
+    content.className = 'dir-content';
+    node.children.forEach(child => buildTree(child, content));
+    container.appendChild(content);
+    item.onclick = (e) => { e.stopPropagation(); content.classList.toggle('open'); };
+  } else if (node.code) {
+    const code = document.createElement('div');
+    code.className = 'code-block';
+    code.textContent = node.code;
+    container.appendChild(code);
+    item.onclick = (e) => { e.stopPropagation(); code.classList.toggle('open'); };
+  }
+}
+
+// ─── Scroll Spy (IntersectionObserver) ───────────────────────────────────────
+function setActive(el) {
+  // 延遲讓 scroll 先發生
+  setTimeout(() => {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    el.classList.add('active');
+  }, 50);
+}
+
+function initScrollSpy() {
+  const sections = document.querySelectorAll('.section');
+  const navItems = document.querySelectorAll('.nav-item');
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const id = entry.target.id;
+        navItems.forEach(n => {
+          n.classList.toggle('active', n.getAttribute('href') === '#' + id);
+        });
+      }
+    });
+  }, { rootMargin: '-30% 0px -60% 0px' });
+  sections.forEach(s => obs.observe(s));
+}
+
+// ─── Init ────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  buildRFCards();
+  updateScore();
+  buildStepper();
+  updateConfidence(55);
+  buildTree(treeData, document.getElementById('dir-tree'));
+  initScrollSpy();
+  startLog();
+});
+</script>
+</body>
+</html>

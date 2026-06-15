@@ -1,0 +1,43 @@
+name: Deploy to GitHub Pages
+
+# 僅在推送 docs/ 目錄變更到 main 時觸發，避免無關 push 消耗 Pages 配額
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'docs/**'
+
+# Pages 部署所需的最小化權限集
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同一時間只允許一個部署在進行，避免並發衝突；
+# cancel-in-progress: false 確保進行中的部署不被新 push 中斷
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './docs'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

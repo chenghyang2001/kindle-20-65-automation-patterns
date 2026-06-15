@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Part 6 — 成本最佳化 | Claude Code Patterns</title>
+<style>
+:root{--bg:#fff;--bg2:#f8fafc;--bg3:#f1f5f9;--border:#e2e8f0;--text:#1e293b;--text2:#64748b;--blue:#2563eb;--bl:#eff6ff;--green:#10b981;--gl:#ecfdf5;--red:#ef4444;--rl:#fef2f2;--yellow:#f59e0b;--yl:#fffbeb;--purple:#7c3aed;--pl:#f5f3ff;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);line-height:1.6;}
+.top-nav{background:var(--text);padding:0 32px;display:flex;align-items:center;gap:24px;height:52px;position:sticky;top:0;z-index:100;}
+.nav-brand{color:#fff;font-weight:700;font-size:15px;text-decoration:none;}
+.nav-links{display:flex;gap:4px;flex-wrap:wrap;}
+.nav-links a{color:#94a3b8;font-size:12px;padding:4px 8px;border-radius:4px;text-decoration:none;}
+.nav-links a:hover,.nav-links a.active{color:#fff;background:rgba(255,255,255,0.15);}
+.part-hero{background:var(--bg3);border-bottom:2px solid #94a3b8;padding:32px 48px;}
+.part-hero h1{font-size:26px;font-weight:800;color:var(--text);}
+.part-hero p{color:var(--text2);font-size:14px;margin-top:6px;}
+.main{max-width:860px;margin:0 auto;padding:40px 48px;}
+.section{margin-bottom:56px;}
+.sec-title{font-size:18px;font-weight:700;margin-bottom:6px;}
+.sec-desc{color:var(--text2);font-size:13px;margin-bottom:16px;}
+.code{background:#0f172a;color:#e2e8f0;border-radius:8px;padding:16px;font-family:monospace;font-size:12px;line-height:1.8;}
+.code .kw{color:#60a5fa;}.code .str{color:#86efac;}.code .cmt{color:#475569;}
+.billing-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+.b-card{background:var(--bg2);border:2px solid var(--border);border-radius:8px;padding:14px;text-align:center;}
+.b-icon{font-size:24px;margin-bottom:6px;}
+.b-name{font-weight:700;font-size:13px;margin-bottom:4px;}
+.b-desc{font-size:11px;color:var(--text2);}
+.b-key{font-size:12px;font-weight:700;color:var(--blue);margin-top:6px;font-family:monospace;}
+.calculator{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:20px;}
+.calc-row{display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap;}
+.calc-label{font-size:12px;font-weight:600;width:120px;flex-shrink:0;}
+.calc-input{width:100px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;text-align:right;}
+.calc-unit{font-size:12px;color:var(--text2);}
+.calc-result{background:var(--bl);border:1px solid var(--blue);border-radius:8px;padding:14px;margin-top:12px;display:flex;gap:24px;justify-content:center;flex-wrap:wrap;}
+.calc-result .r{text-align:center;}
+.calc-result .r-n{font-size:20px;font-weight:800;color:var(--blue);}
+.calc-result .r-l{font-size:11px;color:var(--text2);}
+.model-comparison{width:100%;border-collapse:collapse;}
+.model-comparison th,.model-comparison td{border:1px solid var(--border);padding:10px 14px;text-align:left;font-size:13px;}
+.model-comparison th{background:var(--bg2);font-weight:600;}
+.model-comparison tr:hover{background:var(--bg2);}
+.cache-levels{display:flex;flex-direction:column;gap:6px;}
+.cache-level{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:6px;border:1px solid var(--border);}
+.cache-num{font-size:20px;font-weight:800;width:32px;flex-shrink:0;}
+.cache-content h4{font-size:13px;font-weight:700;margin-bottom:2px;}
+.cache-content p{font-size:12px;color:var(--text2);}
+.cache-level.l1{background:var(--gl);border-color:var(--green);}
+.cache-level.l2{background:var(--bl);border-color:var(--blue);}
+.cache-level.l3{background:var(--pl);border-color:var(--purple);}
+.arb-box{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:20px;}
+.arb-compare{display:grid;grid-template-columns:1fr auto 1fr;gap:16px;align-items:center;}
+.arb-side{border-radius:8px;padding:14px;}
+.arb-before{background:var(--rl);border:1px solid var(--red);}
+.arb-after{background:var(--gl);border:1px solid var(--green);}
+.arb-title{font-weight:700;font-size:13px;margin-bottom:6px;}
+.arb-stat{font-size:12px;color:var(--text2);margin-bottom:3px;}
+.arb-arrow{font-size:24px;color:var(--text2);text-align:center;}
+.saving-badge{background:var(--green);color:#fff;font-weight:800;padding:6px 14px;border-radius:20px;font-size:14px;text-align:center;margin-top:10px;}
+</style>
+</head>
+<body>
+<nav class="top-nav">
+  <a href="index.html" class="nav-brand">Claude Code Patterns</a>
+  <div class="nav-links">
+    <a href="part1.html">P1 設計基礎</a>
+    <a href="part2.html">P2 Hooks</a>
+    <a href="part3.html">P3 Sub-agents</a>
+    <a href="part4.html">P4 CI/CD</a>
+    <a href="part5.html">P5 安全</a>
+    <a href="part6.html" class="active">P6 成本</a>
+    <a href="part7.html">P7 工作流</a>
+  </div>
+</nav>
+
+<div class="part-hero">
+  <h1>Part 6 — 成本最佳化</h1>
+  <p>Token 帳單四欄位 · 模型矩陣 · Prompt 快取 · Sub-agent 套利 · MCP 轉 Skill</p>
+</div>
+
+<div class="main">
+
+  <!-- Section 1: Token 帳單四欄位 -->
+  <div class="section">
+    <div class="sec-title">Token 帳單四欄位</div>
+    <div class="sec-desc">--output-format json 的回傳中有四個關鍵欄位，對應不同計費項目。</div>
+    <div class="billing-cards">
+      <div class="b-card">
+        <div class="b-icon">📥</div>
+        <div class="b-name">input_tokens</div>
+        <div class="b-desc">你傳給 Claude 的 tokens（含 context）</div>
+        <div class="b-key">$3/M（Sonnet）</div>
+      </div>
+      <div class="b-card">
+        <div class="b-icon">📤</div>
+        <div class="b-name">output_tokens</div>
+        <div class="b-desc">Claude 產出的回應 tokens</div>
+        <div class="b-key">$15/M（Sonnet）</div>
+      </div>
+      <div class="b-card" style="border-color:var(--green)">
+        <div class="b-icon">💾</div>
+        <div class="b-name">cache_read_tokens</div>
+        <div class="b-desc">從快取讀取的 tokens（便宜 10×）</div>
+        <div class="b-key">$0.3/M（折扣）</div>
+      </div>
+      <div class="b-card">
+        <div class="b-icon">✏️</div>
+        <div class="b-name">cache_write_tokens</div>
+        <div class="b-desc">寫入快取的 tokens（略貴）</div>
+        <div class="b-key">$3.75/M（1.25×）</div>
+      </div>
+    </div>
+    <div class="code" style="margin-top:16px">
+<span class="cmt"># 用 jq 提取帳單資訊</span>
+RESULT=$(claude -p <span class="str">"..."</span> --output-format json)
+echo $RESULT | jq <span class="str">'{cost: .cost_usd, input: .input_tokens, output: .output_tokens}'</span></div>
+  </div>
+
+  <!-- Section 2: 成本計算機 -->
+  <div class="section">
+    <div class="sec-title">Token 成本計算機</div>
+    <div class="sec-desc">估算 API 呼叫成本（使用 Claude Sonnet 4.6 計費）。</div>
+    <div class="calculator">
+      <div class="calc-row">
+        <div class="calc-label">輸入 Tokens</div>
+        <input class="calc-input" id="inp-tok" type="number" value="1000" min="0" oninput="calcCost()">
+        <span class="calc-unit">tokens</span>
+      </div>
+      <div class="calc-row">
+        <div class="calc-label">輸出 Tokens</div>
+        <input class="calc-input" id="out-tok" type="number" value="200" min="0" oninput="calcCost()">
+        <span class="calc-unit">tokens</span>
+      </div>
+      <div class="calc-row">
+        <div class="calc-label">快取命中率</div>
+        <input class="calc-input" id="cache-rate" type="number" value="0" min="0" max="100" oninput="calcCost()">
+        <span class="calc-unit">%（輸入 tokens 中有多少從快取讀取）</span>
+      </div>
+      <div class="calc-result" id="calc-result"></div>
+    </div>
+  </div>
+
+  <!-- Section 3: 模型比較 -->
+  <div class="section">
+    <div class="sec-title">模型成本比較表</div>
+    <div class="sec-desc">選對模型是最有效的成本控制手段。</div>
+    <table class="model-comparison">
+      <tr><th>模型</th><th>輸入 / M tokens</th><th>輸出 / M tokens</th><th>最佳用途</th></tr>
+      <tr style="background:var(--gl)"><td><strong>Haiku 4.5</strong></td><td>$0.80</td><td>$4</td><td>探索/搜尋/格式化/通知（省 60-80%）</td></tr>
+      <tr><td><strong>Sonnet 4.6</strong></td><td>$3</td><td>$15</td><td>一般開發/分析/程式碼生成（最常用）</td></tr>
+      <tr style="background:var(--rl)"><td><strong>Opus 4.6</strong></td><td>$15</td><td>$75</td><td>複雜推理（謹慎使用，比 Haiku 貴 94×）</td></tr>
+    </table>
+    <div class="code" style="margin-top:16px">
+<span class="cmt"># Agent AGENT.md frontmatter 指定模型</span>
+---
+<span class="kw">model</span>: haiku
+<span class="kw">description</span>: 探索型代理，搜尋用 Haiku 省 80%
+<span class="kw">tools</span>: [Read, Grep, Glob]
+---</div>
+  </div>
+
+  <!-- Section 4: Prompt 快取三層 -->
+  <div class="section">
+    <div class="sec-title">Prompt 快取三層設計</div>
+    <div class="sec-desc">把最穩定的 Context 放在最前面，讓快取命中率最大化。</div>
+    <div class="cache-levels">
+      <div class="cache-level l1">
+        <div class="cache-num" style="color:var(--green)">1</div>
+        <div class="cache-content">
+          <h4>系統層（永遠需要）</h4>
+          <p>CLAUDE.md 的全域規則、語言鐵律、禁止硬編碼路徑。這層幾乎不變，快取命中率接近 100%。</p>
+        </div>
+      </div>
+      <div class="cache-level l2">
+        <div class="cache-num" style="color:var(--blue)">2</div>
+        <div class="cache-content">
+          <h4>專案層（條件需要）</h4>
+          <p>專案 CLAUDE.md、技術堆疊說明、資料庫連線規則。每個專案一份，跨 session 複用。</p>
+        </div>
+      </div>
+      <div class="cache-level l3">
+        <div class="cache-num" style="color:var(--purple)">3</div>
+        <div class="cache-content">
+          <h4>任務層（隨需呼叫）</h4>
+          <p>當前任務的 context：開啟的檔案、搜尋結果、Git diff。每次任務不同，不依賴快取。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 5: Sub-agent 套利 -->
+  <div class="section">
+    <div class="sec-title">Sub-agent 套利</div>
+    <div class="sec-desc">用 Haiku 做偵察，只回傳路徑；讓 Sonnet 只讀必要檔案。節省大量 output tokens。</div>
+    <div class="arb-box">
+      <div class="arb-compare">
+        <div class="arb-side arb-before">
+          <div class="arb-title" style="color:var(--red)">❌ 傳統做法</div>
+          <div class="arb-stat">Sonnet 直接搜尋所有檔案</div>
+          <div class="arb-stat">讀取：100 個檔案 × 平均 200 行</div>
+          <div class="arb-stat">= 20,000 行 → ~40,000 tokens</div>
+          <div class="arb-stat" style="font-weight:700;color:var(--red);margin-top:8px">費用：$0.60</div>
+        </div>
+        <div class="arb-arrow">→</div>
+        <div class="arb-side arb-after">
+          <div class="arb-title" style="color:var(--green)">✅ Sub-agent 套利</div>
+          <div class="arb-stat">Haiku 偵察：只回傳 3 個相關路徑</div>
+          <div class="arb-stat">Sonnet 精讀：3 個檔案 × 200 行</div>
+          <div class="arb-stat">= 600 行 → ~1,200 tokens</div>
+          <div class="arb-stat" style="font-weight:700;color:var(--green);margin-top:8px">費用：$0.002</div>
+        </div>
+      </div>
+      <div class="saving-badge">節省 299× output tokens</div>
+    </div>
+    <div class="code" style="margin-top:16px">
+<span class="cmt"># Haiku 偵察，只回傳路徑</span>
+<span class="kw">Agent</span>({
+  subagent_type: <span class="str">"Explore"</span>,
+  model: <span class="str">"haiku"</span>,
+  prompt: <span class="str">"找出所有定義 pymysql.connect 的 .py 檔路徑（只回傳路徑，不讀內容）"</span>
+})
+<span class="cmt"># Sonnet 精讀（只讀 Haiku 找到的幾個檔）</span>
+<span class="kw">Read</span>(<span class="str">"code/part3-subagents/observe-pattern.py"</span>)</div>
+  </div>
+
+</div>
+
+<script>
+function calcCost(){
+  const inp=parseFloat(document.getElementById('inp-tok').value)||0;
+  const out=parseFloat(document.getElementById('out-tok').value)||0;
+  const cacheRate=parseFloat(document.getElementById('cache-rate').value)||0;
+  const cacheRead=inp*(cacheRate/100);
+  const normalInp=inp-cacheRead;
+  const inpCost=normalInp*3/1e6;
+  const outCost=out*15/1e6;
+  const cacheCost=cacheRead*0.3/1e6;
+  const total=inpCost+outCost+cacheCost;
+  const noCache=inp*3/1e6+outCost;
+  const saving=noCache-total;
+  document.getElementById('calc-result').innerHTML=`
+    <div class="r"><div class="r-n">$${total.toFixed(5)}</div><div class="r-l">實際費用（USD）</div></div>
+    <div class="r"><div class="r-n" style="color:var(--green)">$${saving.toFixed(5)}</div><div class="r-l">快取節省</div></div>
+    <div class="r"><div class="r-n">${(saving/noCache*100||0).toFixed(1)}%</div><div class="r-l">節省比例</div></div>
+  `;
+}
+calcCost();
+</script>
+</body>
+</html>

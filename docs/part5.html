@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Part 5 — 資安與權限 | Claude Code Patterns</title>
+<style>
+:root{--bg:#fff;--bg2:#f8fafc;--bg3:#f1f5f9;--border:#e2e8f0;--text:#1e293b;--text2:#64748b;--blue:#2563eb;--bl:#eff6ff;--green:#10b981;--gl:#ecfdf5;--red:#ef4444;--rl:#fef2f2;--yellow:#f59e0b;--yl:#fffbeb;--purple:#7c3aed;--pl:#f5f3ff;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);line-height:1.6;}
+.top-nav{background:var(--text);padding:0 32px;display:flex;align-items:center;gap:24px;height:52px;position:sticky;top:0;z-index:100;}
+.nav-brand{color:#fff;font-weight:700;font-size:15px;text-decoration:none;}
+.nav-links{display:flex;gap:4px;flex-wrap:wrap;}
+.nav-links a{color:#94a3b8;font-size:12px;padding:4px 8px;border-radius:4px;text-decoration:none;}
+.nav-links a:hover,.nav-links a.active{color:#fff;background:rgba(255,255,255,0.15);}
+.part-hero{background:var(--rl);border-bottom:2px solid var(--red);padding:32px 48px;}
+.part-hero h1{font-size:26px;font-weight:800;color:var(--red);}
+.part-hero p{color:var(--text2);font-size:14px;margin-top:6px;}
+.main{max-width:860px;margin:0 auto;padding:40px 48px;}
+.section{margin-bottom:56px;}
+.sec-title{font-size:18px;font-weight:700;margin-bottom:6px;}
+.sec-desc{color:var(--text2);font-size:13px;margin-bottom:16px;}
+.code{background:#0f172a;color:#e2e8f0;border-radius:8px;padding:16px;font-family:monospace;font-size:12px;line-height:1.8;}
+.code .kw{color:#60a5fa;}.code .str{color:#86efac;}.code .cmt{color:#475569;}
+.perm-layers{display:flex;flex-direction:column;gap:8px;}
+.perm-layer{display:flex;align-items:flex-start;gap:16px;padding:16px;border-radius:8px;}
+.layer-deny{background:var(--rl);border-left:4px solid var(--red);}
+.layer-ask{background:var(--yl);border-left:4px solid var(--yellow);}
+.layer-allow{background:var(--gl);border-left:4px solid var(--green);}
+.layer-badge{font-weight:800;font-size:16px;min-width:60px;margin-top:2px;}
+.layer-content h4{font-size:14px;font-weight:700;margin-bottom:4px;}
+.layer-content p{font-size:12px;color:var(--text2);line-height:1.6;}
+.rule-builder{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:20px;}
+.rule-row{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;}
+.rule-label{font-size:12px;font-weight:600;width:60px;flex-shrink:0;}
+.rule-select,.rule-input{padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:monospace;}
+.rule-output{background:#0f172a;color:#86efac;border-radius:6px;padding:12px;font-family:monospace;font-size:12px;margin-top:12px;white-space:pre;}
+.scanner-box{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:20px;}
+.scan-input{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:6px;font-family:monospace;font-size:12px;margin-bottom:12px;resize:vertical;min-height:80px;}
+.scan-result{padding:10px 14px;border-radius:6px;font-size:13px;font-weight:600;}
+.scan-ok{background:var(--gl);color:var(--green);}
+.scan-warn{background:var(--rl);color:var(--red);}
+.checklist{display:grid;gap:8px;}
+.check-item{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;cursor:pointer;}
+.check-item.done{background:var(--gl);border-color:var(--green);}
+.check-box{width:20px;height:20px;border:2px solid var(--border);border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:12px;}
+.check-item.done .check-box{background:var(--green);border-color:var(--green);color:#fff;}
+.check-text{font-size:13px;}
+</style>
+</head>
+<body>
+<nav class="top-nav">
+  <a href="index.html" class="nav-brand">Claude Code Patterns</a>
+  <div class="nav-links">
+    <a href="part1.html">P1 設計基礎</a>
+    <a href="part2.html">P2 Hooks</a>
+    <a href="part3.html">P3 Sub-agents</a>
+    <a href="part4.html">P4 CI/CD</a>
+    <a href="part5.html" class="active">P5 安全</a>
+    <a href="part6.html">P6 成本</a>
+    <a href="part7.html">P7 工作流</a>
+  </div>
+</nav>
+
+<div class="part-hero">
+  <h1>Part 5 — 資安與權限</h1>
+  <p>Deny > Ask > Allow 優先順序 · 三層分層設計 · Secret Scanner · 沙盒隔離</p>
+</div>
+
+<div class="main">
+
+  <!-- Section 1: 三層分層 -->
+  <div class="section">
+    <div class="sec-title">Deny > Ask > Allow 優先順序</div>
+    <div class="sec-desc">三層按優先順序套用，Deny 永遠比 Ask 和 Allow 先生效。</div>
+    <div class="perm-layers">
+      <div class="perm-layer layer-deny">
+        <div class="layer-badge" style="color:var(--red)">🚫 Deny</div>
+        <div class="layer-content">
+          <h4>永遠封鎖（最高優先）</h4>
+          <p>無論使用者怎麼要求，這些操作絕對不執行。<br>
+          常用規則：<code>Bash(rm -rf*)</code>、<code>Bash(git push --force*)</code>、<code>Bash(DROP TABLE*)</code>、<code>mcp__playwright__*</code></p>
+        </div>
+      </div>
+      <div class="perm-layer layer-ask">
+        <div class="layer-badge" style="color:#92400e">❓ Ask</div>
+        <div class="layer-content">
+          <h4>需要確認</h4>
+          <p>每次執行前都必須讓使用者明確同意。<br>
+          常用規則：<code>WebFetch(*)</code>（所有外部請求）、<code>Bash(curl*)</code>、特定的 MCP 工具。</p>
+        </div>
+      </div>
+      <div class="perm-layer layer-allow">
+        <div class="layer-badge" style="color:var(--green)">✓ Allow</div>
+        <div class="layer-content">
+          <h4>自動放行</h4>
+          <p>在已知安全範圍內自動執行。<br>
+          常用規則：<code>Read(*)</code>、<code>Write(code/*)</code>、<code>Bash(python -m pytest*)</code></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 2: 規則建構器 -->
+  <div class="section">
+    <div class="sec-title">Permission 規則建構器</div>
+    <div class="sec-desc">互動式建構 settings.json 的 permissions 規則。</div>
+    <div class="rule-builder">
+      <div class="rule-row">
+        <div class="rule-label">類型</div>
+        <select class="rule-select" id="rule-type" onchange="buildRule()">
+          <option value="deny">deny（封鎖）</option>
+          <option value="allow">allow（放行）</option>
+        </select>
+      </div>
+      <div class="rule-row">
+        <div class="rule-label">工具</div>
+        <select class="rule-select" id="rule-tool" onchange="buildRule()">
+          <option value="Bash">Bash</option>
+          <option value="Write">Write</option>
+          <option value="Edit">Edit</option>
+          <option value="WebFetch">WebFetch</option>
+          <option value="mcp__playwright__*">mcp__playwright__*</option>
+          <option value="Read">Read</option>
+        </select>
+      </div>
+      <div class="rule-row">
+        <div class="rule-label">Pattern</div>
+        <input class="rule-input" id="rule-pattern" value="rm -rf*" oninput="buildRule()" placeholder="例：rm -rf*、code/*、*">
+      </div>
+      <div class="rule-output" id="rule-output"></div>
+    </div>
+  </div>
+
+  <!-- Section 3: Secret Scanner Demo -->
+  <div class="section">
+    <div class="sec-title">Secret Scanner 模擬器</div>
+    <div class="sec-desc">在 PreToolUse Hook 掃描即將寫入的檔案內容，攔截硬編碼機密。</div>
+    <div class="scanner-box">
+      <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px;">即將寫入的內容（貼入程式碼模擬 Write 操作）</label>
+      <textarea class="scan-input" id="scan-input" oninput="runScan()" placeholder='貼入程式碼，包含可疑字串，例如：&#10;API_KEY = "sk-ant-api03-abc123"&#10;或 password = "hunter2"'></textarea>
+      <button onclick="runScan()" style="padding:8px 20px;background:var(--red);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">掃描</button>
+      <div class="scan-result scan-ok" id="scan-result" style="margin-top:12px">輸入內容後點擊掃描</div>
+    </div>
+  </div>
+
+  <!-- Section 4: 安全 Checklist -->
+  <div class="section">
+    <div class="sec-title">部署前安全 Checklist</div>
+    <div class="sec-desc">點擊項目標記完成。</div>
+    <div class="checklist" id="checklist">
+      <div class="check-item" onclick="toggle(this)"><div class="check-box"></div><div class="check-text">✅ 所有 SQL 查詢使用參數化查詢（無字串拼接）</div></div>
+      <div class="check-item" onclick="toggle(this)"><div class="check-box"></div><div class="check-text">✅ .env / credentials.json / token.json 已加入 .gitignore</div></div>
+      <div class="check-item" onclick="toggle(this)"><div class="check-box"></div><div class="check-text">✅ 程式碼無硬編碼 API Key（用環境變數讀取）</div></div>
+      <div class="check-item" onclick="toggle(this)"><div class="check-box"></div><div class="check-text">✅ Deny rules 已設定危險操作（rm -rf、DROP TABLE、force push）</div></div>
+      <div class="check-item" onclick="toggle(this)"><div class="check-box"></div><div class="check-text">✅ Secret Scanner Hook 已啟用（PreToolUse Write/Edit）</div></div>
+      <div class="check-item" onclick="toggle(this)"><div class="check-box"></div><div class="check-text">✅ auto-fix 只能修改 code/ 目錄（路徑限制已設定）</div></div>
+      <div class="check-item" onclick="toggle(this)"><div class="check-box"></div><div class="check-text">✅ AWS RDS MySQL 僅執行 SELECT（無寫入操作）</div></div>
+      <div class="check-item" onclick="toggle(this)"><div class="check-box"></div><div class="check-text">✅ ANTHROPIC_API_KEY 未設定為全域環境變數</div></div>
+    </div>
+    <div id="check-summary" style="margin-top:12px;padding:10px 14px;background:var(--bg2);border-radius:6px;font-size:13px;color:var(--text2);text-align:center;">0 / 8 完成</div>
+  </div>
+
+</div>
+
+<script>
+function buildRule(){
+  const t=document.getElementById('rule-type').value;
+  const tool=document.getElementById('rule-tool').value;
+  const pat=document.getElementById('rule-pattern').value;
+  const ruleStr=tool==='mcp__playwright__*'?tool:`${tool}(${pat})`;
+  const full=`{
+  "permissions": {
+    "${t}": [
+      "${ruleStr}"
+    ]
+  }
+}`;
+  document.getElementById('rule-output').textContent=full;
+}
+buildRule();
+
+const PATTERNS=[
+  {re:/sk-ant-api[0-9a-zA-Z-]+/,name:'Anthropic API Key'},
+  {re:/sk-[a-zA-Z0-9]{20,}/,name:'OpenAI API Key'},
+  {re:/AKIA[0-9A-Z]{16}/,name:'AWS Access Key'},
+  {re:/password\s*=\s*["'][^"']{4,}["']/i,name:'Hardcoded password'},
+  {re:/api[_-]?key\s*=\s*["'][^"']{8,}["']/i,name:'API Key 常數'},
+  {re:/token\s*=\s*["'][^"']{8,}["']/i,name:'Token 常數'},
+  {re:/secret\s*=\s*["'][^"']{8,}["']/i,name:'Secret 常數'},
+];
+function runScan(){
+  const text=document.getElementById('scan-input').value;
+  const el=document.getElementById('scan-result');
+  if(!text.trim()){el.textContent='輸入內容後點擊掃描';el.className='scan-result scan-ok';return;}
+  const found=[];
+  PATTERNS.forEach(p=>{if(p.re.test(text))found.push(p.name);});
+  if(found.length){
+    el.textContent='🚫 偵測到機密：'+found.join('、')+'　→ PreToolUse Hook 會 exit 1 阻擋此次 Write 操作';
+    el.className='scan-result scan-warn';
+  }else{
+    el.textContent='✓ 未偵測到已知機密模式，內容可以安全寫入';
+    el.className='scan-result scan-ok';
+  }
+}
+function toggle(el){
+  el.classList.toggle('done');
+  el.querySelector('.check-box').textContent=el.classList.contains('done')?'✓':'';
+  const total=document.querySelectorAll('.check-item').length;
+  const done=document.querySelectorAll('.check-item.done').length;
+  const s=document.getElementById('check-summary');
+  s.textContent=`${done} / ${total} 完成`;
+  s.style.color=done===total?'var(--green)':'var(--text2)';
+}
+</script>
+</body>
+</html>

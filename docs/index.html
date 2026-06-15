@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Code Automation Patterns — 互動學習</title>
+<style>
+:root{--bg:#fff;--bg2:#f8fafc;--bg3:#f1f5f9;--border:#e2e8f0;--text:#1e293b;--text2:#64748b;--blue:#2563eb;--bl:#eff6ff;--green:#10b981;--gl:#ecfdf5;--red:#ef4444;--rl:#fef2f2;--yellow:#f59e0b;--yl:#fffbeb;--purple:#7c3aed;--pl:#f5f3ff;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);line-height:1.6;}
+.top-nav{background:var(--text);padding:0 32px;display:flex;align-items:center;gap:24px;height:52px;position:sticky;top:0;z-index:100;}
+.nav-brand{color:#fff;font-weight:700;font-size:15px;text-decoration:none;white-space:nowrap;}
+.nav-links{display:flex;gap:4px;flex-wrap:wrap;}
+.nav-links a{color:#94a3b8;font-size:12px;padding:4px 8px;border-radius:4px;text-decoration:none;transition:color 0.15s;}
+.nav-links a:hover,.nav-links a.active{color:#fff;background:rgba(255,255,255,0.1);}
+.hero{background:var(--text);color:#fff;padding:64px 48px;text-align:center;}
+.hero h1{font-size:36px;font-weight:800;margin-bottom:12px;}
+.hero p{color:#94a3b8;font-size:16px;max-width:600px;margin:0 auto 32px;}
+.hero-stats{display:flex;gap:32px;justify-content:center;flex-wrap:wrap;}
+.stat{text-align:center;}
+.stat-n{font-size:32px;font-weight:800;color:#60a5fa;}
+.stat-l{font-size:13px;color:#94a3b8;margin-top:2px;}
+.main{max-width:1000px;margin:0 auto;padding:48px 32px;}
+.parts-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px;}
+.part-card{background:var(--bg2);border:2px solid var(--border);border-radius:12px;padding:24px;text-decoration:none;color:var(--text);transition:all 0.2s;display:block;}
+.part-card:hover{border-color:var(--blue);box-shadow:0 4px 16px rgba(37,99,235,0.12);transform:translateY(-2px);}
+.part-num{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;}
+.part-title{font-size:18px;font-weight:700;margin-bottom:6px;}
+.part-desc{font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:12px;}
+.part-tags{display:flex;gap:6px;flex-wrap:wrap;}
+.tag{font-size:11px;padding:2px 8px;border-radius:12px;font-weight:500;}
+.learning-path{margin-top:48px;}
+.path-title{font-size:20px;font-weight:700;margin-bottom:20px;}
+.path-flow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:20px;background:var(--bg2);border-radius:12px;border:1px solid var(--border);}
+.path-step{padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;white-space:nowrap;}
+.path-arrow{color:var(--text2);font-size:18px;}
+.p1{background:var(--bl);color:var(--blue);}
+.p2{background:var(--gl);color:var(--green);}
+.p3{background:var(--pl);color:var(--purple);}
+.p4{background:var(--yl);color:var(--yellow);}
+.p5{background:var(--rl);color:var(--red);}
+.p6{background:var(--bg3);color:var(--text);}
+.p7{background:var(--text);color:#fff;}
+footer{text-align:center;padding:32px;color:var(--text2);font-size:13px;border-top:1px solid var(--border);margin-top:48px;}
+</style>
+</head>
+<body>
+<nav class="top-nav">
+  <a href="index.html" class="nav-brand">Claude Code Patterns</a>
+  <div class="nav-links">
+    <a href="part1.html">P1 設計基礎</a>
+    <a href="part2.html">P2 Hooks</a>
+    <a href="part3.html">P3 Sub-agents</a>
+    <a href="part4.html">P4 CI/CD</a>
+    <a href="part5.html">P5 安全</a>
+    <a href="part6.html">P6 成本</a>
+    <a href="part7.html">P7 工作流</a>
+  </div>
+</nav>
+
+<div class="hero">
+  <h1>Claude Code Automation Patterns</h1>
+  <p>從 Context 設計到 Plugin 封裝，完整掌握 AI 工程化的七大核心模式。每個 Part 都有互動練習。</p>
+  <div class="hero-stats">
+    <div class="stat"><div class="stat-n">7</div><div class="stat-l">Parts</div></div>
+    <div class="stat"><div class="stat-n">45</div><div class="stat-l">課次</div></div>
+    <div class="stat"><div class="stat-n">100+</div><div class="stat-l">實用模式</div></div>
+    <div class="stat"><div class="stat-n">∞</div><div class="stat-l">互動練習</div></div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="parts-grid">
+    <a href="part1.html" class="part-card">
+      <div class="part-num" style="color:var(--blue)">Part 1</div>
+      <div class="part-title">設計基礎</div>
+      <div class="part-desc">Context 三層架構、CLAUDE.md 模組化設計、Sub-agent FrontMatter 最佳實踐、動態 Context 注入。</div>
+      <div class="part-tags">
+        <span class="tag p1">CLAUDE.md</span>
+        <span class="tag p1">FrontMatter</span>
+        <span class="tag p1">Context 管理</span>
+      </div>
+    </a>
+    <a href="part2.html" class="part-card">
+      <div class="part-num" style="color:var(--green)">Part 2</div>
+      <div class="part-title">Hook 自動化</div>
+      <div class="part-desc">PreToolUse / PostToolUse / Stop 三個時機點、matcher 模式、exit code 控制流、10 種實用 Hook 範例。</div>
+      <div class="part-tags">
+        <span class="tag p2">PreToolUse</span>
+        <span class="tag p2">PostToolUse</span>
+        <span class="tag p2">Exit Code</span>
+      </div>
+    </a>
+    <a href="part3.html" class="part-card">
+      <div class="part-num" style="color:var(--purple)">Part 3</div>
+      <div class="part-title">Sub-agents</div>
+      <div class="part-desc">6 個內建 Agent 解剖、模型選擇矩陣（Haiku 省 60-80%）、反理由化行為、串聯審查流水線。</div>
+      <div class="part-tags">
+        <span class="tag p3">Explore Agent</span>
+        <span class="tag p3">模型選擇</span>
+        <span class="tag p3">反理由化</span>
+      </div>
+    </a>
+    <a href="part4.html" class="part-card">
+      <div class="part-num" style="color:var(--yellow)">Part 4</div>
+      <div class="part-title">CI/CD 流水線</div>
+      <div class="part-desc">Headless 模式三種傳入方式、Auto-pilot PR 審查、多步驟 Pipeline、5 個常見 CI 陷阱。</div>
+      <div class="part-tags">
+        <span class="tag p4">claude -p</span>
+        <span class="tag p4">PR Auto-pilot</span>
+        <span class="tag p4">Pipeline</span>
+      </div>
+    </a>
+    <a href="part5.html" class="part-card">
+      <div class="part-num" style="color:var(--red)">Part 5</div>
+      <div class="part-title">資安與權限</div>
+      <div class="part-desc">Deny > Ask > Allow 優先順序、三層分層權限設計、Secret Scanner Hook、沙盒隔離模式。</div>
+      <div class="part-tags">
+        <span class="tag p5">Deny Rules</span>
+        <span class="tag p5">Secret Scanner</span>
+        <span class="tag p5">沙盒隔離</span>
+      </div>
+    </a>
+    <a href="part6.html" class="part-card">
+      <div class="part-num" style="color:var(--text2)">Part 6</div>
+      <div class="part-title">成本最佳化</div>
+      <div class="part-desc">Token 帳單四欄位、模型選擇矩陣、Prompt 快取三層設計、Sub-agent 套利、MCP 轉 Skill。</div>
+      <div class="part-tags">
+        <span class="tag p6">Token 計費</span>
+        <span class="tag p6">Prompt 快取</span>
+        <span class="tag p6">成本套利</span>
+      </div>
+    </a>
+    <a href="part7.html" class="part-card" style="border-color:var(--text)">
+      <div class="part-num" style="color:var(--text)">Part 7</div>
+      <div class="part-title">進階工作流</div>
+      <div class="part-desc">7 種幻覺類型偵測、信心清單、動態編排、七階段工作流、多 Agent Worktree、Plugin 封裝。</div>
+      <div class="part-tags">
+        <span class="tag p7">幻覺偵測</span>
+        <span class="tag p7">Plugin 封裝</span>
+        <span class="tag p7">Worktree</span>
+      </div>
+    </a>
+  </div>
+
+  <div class="learning-path">
+    <div class="path-title">建議學習路徑</div>
+    <div class="path-flow">
+      <span class="path-step p1">P1 設計基礎</span>
+      <span class="path-arrow">→</span>
+      <span class="path-step p2">P2 Hooks 自動化</span>
+      <span class="path-arrow">→</span>
+      <span class="path-step p3">P3 Sub-agents</span>
+      <span class="path-arrow">→</span>
+      <span class="path-step p4">P4 CI/CD</span>
+      <span class="path-arrow">→</span>
+      <span class="path-step p5">P5 資安</span>
+      <span class="path-arrow">→</span>
+      <span class="path-step p6">P6 成本控制</span>
+      <span class="path-arrow">→</span>
+      <span class="path-step p7">P7 生產工作流</span>
+    </div>
+  </div>
+</div>
+
+<footer>Claude Code Automation Patterns — 互動學習平台 | chenghyang2001</footer>
+</body>
+</html>

@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Part 1 — 設計基礎 | Claude Code Patterns</title>
+<style>
+:root{--bg:#fff;--bg2:#f8fafc;--bg3:#f1f5f9;--border:#e2e8f0;--text:#1e293b;--text2:#64748b;--blue:#2563eb;--bl:#eff6ff;--green:#10b981;--gl:#ecfdf5;--red:#ef4444;--rl:#fef2f2;--yellow:#f59e0b;--yl:#fffbeb;--purple:#7c3aed;--pl:#f5f3ff;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);line-height:1.6;}
+.top-nav{background:var(--text);padding:0 32px;display:flex;align-items:center;gap:24px;height:52px;position:sticky;top:0;z-index:100;}
+.nav-brand{color:#fff;font-weight:700;font-size:15px;text-decoration:none;}
+.nav-links{display:flex;gap:4px;flex-wrap:wrap;}
+.nav-links a{color:#94a3b8;font-size:12px;padding:4px 8px;border-radius:4px;text-decoration:none;transition:color 0.15s;}
+.nav-links a:hover,.nav-links a.active{color:#fff;background:rgba(255,255,255,0.15);}
+.part-hero{background:var(--bl);border-bottom:2px solid var(--blue);padding:32px 48px;}
+.part-hero h1{font-size:26px;font-weight:800;color:var(--blue);}
+.part-hero p{color:var(--text2);font-size:14px;margin-top:6px;}
+.main{max-width:860px;margin:0 auto;padding:40px 48px;}
+.section{margin-bottom:56px;}
+.sec-title{font-size:18px;font-weight:700;margin-bottom:6px;}
+.sec-desc{color:var(--text2);font-size:13px;margin-bottom:16px;}
+.tabs{display:flex;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:0;}
+.tab-btn{flex:1;padding:10px;border:none;background:var(--bg2);cursor:pointer;font-size:13px;font-weight:600;color:var(--text2);transition:all 0.15s;border-right:1px solid var(--border);}
+.tab-btn:last-child{border-right:none;}
+.tab-btn.active{background:var(--blue);color:#fff;}
+.tab-panel{display:none;border:1px solid var(--border);border-top:none;border-radius:0 0 8px 8px;padding:20px;}
+.tab-panel.active{display:block;}
+.layer-box{border:2px solid var(--border);border-radius:8px;margin-bottom:12px;overflow:hidden;}
+.layer-header{padding:12px 16px;font-weight:700;font-size:14px;display:flex;align-items:center;gap:10px;}
+.layer-body{padding:12px 16px;border-top:1px solid var(--border);font-size:13px;color:var(--text2);}
+.layer-1{border-color:var(--blue);}
+.layer-1 .layer-header{background:var(--bl);color:var(--blue);}
+.layer-2{border-color:var(--green);}
+.layer-2 .layer-header{background:var(--gl);color:var(--green);}
+.layer-3{border-color:var(--purple);}
+.layer-3 .layer-header{background:var(--pl);color:var(--purple);}
+.code{background:#0f172a;color:#e2e8f0;border-radius:8px;padding:16px;font-family:monospace;font-size:12px;line-height:1.8;margin-top:12px;}
+.code .kw{color:#60a5fa;}
+.code .str{color:#86efac;}
+.code .cmt{color:#475569;}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:12px;}
+.card-header{display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none;}
+.card-title{font-weight:600;font-size:14px;}
+.toggle{font-size:16px;color:var(--text2);transition:transform 0.2s;}
+.toggle.open{transform:rotate(180deg);}
+.card-body{display:none;margin-top:12px;border-top:1px solid var(--border);padding-top:12px;font-size:13px;color:var(--text2);}
+.card-body.open{display:block;}
+.checklist{list-style:none;}
+.checklist li{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);}
+.checklist li:last-child{border-bottom:none;}
+.checklist input{width:18px;height:18px;margin-top:1px;flex-shrink:0;accent-color:var(--blue);}
+.checklist label{font-size:13px;cursor:pointer;}
+.checklist .sub{font-size:12px;color:var(--text2);display:block;margin-top:2px;}
+.check-result{margin-top:12px;padding:12px 16px;border-radius:8px;font-weight:600;font-size:14px;text-align:center;}
+.badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;}
+.b-blue{background:var(--bl);color:var(--blue);}
+.b-green{background:var(--gl);color:var(--green);}
+.b-yellow{background:var(--yl);color:var(--yellow);}
+.fm-builder{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:20px;}
+.fm-row{display:flex;gap:12px;align-items:flex-start;margin-bottom:12px;}
+.fm-label{width:140px;font-size:13px;font-weight:600;padding-top:6px;flex-shrink:0;}
+.fm-input{flex:1;}
+.fm-input input,.fm-input select,.fm-input textarea{width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;background:var(--bg);}
+.fm-input textarea{height:60px;resize:vertical;}
+.fm-output{margin-top:16px;}
+.btn{padding:8px 20px;border-radius:6px;border:1px solid var(--border);background:var(--bg);cursor:pointer;font-size:13px;font-weight:600;transition:all 0.15s;}
+.btn:hover{background:var(--bg3);}
+.btn.primary{background:var(--blue);color:#fff;border-color:var(--blue);}
+.btn.primary:hover{background:#1d4ed8;}
+</style>
+</head>
+<body>
+<nav class="top-nav">
+  <a href="index.html" class="nav-brand">Claude Code Patterns</a>
+  <div class="nav-links">
+    <a href="part1.html" class="active">P1 設計基礎</a>
+    <a href="part2.html">P2 Hooks</a>
+    <a href="part3.html">P3 Sub-agents</a>
+    <a href="part4.html">P4 CI/CD</a>
+    <a href="part5.html">P5 安全</a>
+    <a href="part6.html">P6 成本</a>
+    <a href="part7.html">P7 工作流</a>
+  </div>
+</nav>
+
+<div class="part-hero">
+  <h1>Part 1 — 設計基礎</h1>
+  <p>Context 三層架構 · CLAUDE.md 模組化 · FrontMatter 設計 · 動態 Context 注入</p>
+</div>
+
+<div class="main">
+
+  <!-- Section 1: Context 三層架構 -->
+  <div class="section">
+    <div class="sec-title">Context 三層架構</div>
+    <div class="sec-desc">點擊 Tab 了解每層的設計原則與適用場景。</div>
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('ctx','always',this)">永遠需要</button>
+      <button class="tab-btn" onclick="switchTab('ctx','cond',this)">條件需要</button>
+      <button class="tab-btn" onclick="switchTab('ctx','demand',this)">隨需呼叫</button>
+    </div>
+    <div class="tab-panel active" id="ctx-always">
+      <div class="layer-box layer-1">
+        <div class="layer-header">🔵 Layer 1 — 永遠需要 (Always-on)</div>
+        <div class="layer-body">
+          <strong>放在 CLAUDE.md 最頂部</strong>，每次 session 都自動載入。適合：全域規則、禁止操作（如 MySQL 唯讀）、語言偏好、Git 工作流。<br><br>
+          原則：<strong>少即是多</strong>。放太多內容反而稀釋重要規則。只放「如果 Claude 不知道，每次都會犯錯」的內容。
+        </div>
+      </div>
+      <div class="code">
+<span class="cmt"># CLAUDE.md 頂部 — Always-on context</span>
+<span class="kw">## 鐵律</span>
+- AWS RDS MySQL（zap_api）<span class="str">只能 SELECT，絕對不可修改</span>
+- commit message 使用繁體中文
+- 不使用 --no-verify</div>
+    </div>
+    <div class="tab-panel" id="ctx-cond">
+      <div class="layer-box layer-2">
+        <div class="layer-header">🟢 Layer 2 — 條件需要 (Conditional)</div>
+        <div class="layer-body">
+          用 <code>@instructions/xxx.md</code> 語法引用，只在相關任務時才被讀取。適合：框架規範、資料庫設計原則、部署流程、特定模組的開發規則。<br><br>
+          好處：模組化 → 可以針對不同專案組合不同規則，不會讓 CLAUDE.md 越來越臃腫。
+        </div>
+      </div>
+      <div class="code">
+<span class="cmt"># CLAUDE.md 中段 — Conditional context</span>
+<span class="kw">@instructions/tech-stack.md</span>     <span class="cmt"># 前端技術規範</span>
+<span class="kw">@instructions/code-quality.md</span>   <span class="cmt"># 程式碼品質原則</span>
+<span class="kw">@instructions/dev-workflow.md</span>   <span class="cmt"># 開發工作流</span></div>
+    </div>
+    <div class="tab-panel" id="ctx-demand">
+      <div class="layer-box layer-3">
+        <div class="layer-header">🟣 Layer 3 — 隨需呼叫 (On-demand)</div>
+        <div class="layer-body">
+          Skills（<code>/skill-name</code>）和 Sub-agent，只在需要時才觸發。不佔用日常 context，但功能隨時可用。適合：分析任務、特定操作流程、一次性的複雜工作流。<br><br>
+          設計哲學：<strong>把 context 留給真正需要的資訊</strong>，其餘的讓使用者明確呼叫。
+        </div>
+      </div>
+      <div class="code">
+<span class="cmt"># 隨需呼叫 — Skills</span>
+<span class="str">/confidence-check</span>   <span class="cmt"># 實作前信心清單</span>
+<span class="str">/orchestrate</span>        <span class="cmt"># 動態任務編排</span>
+<span class="str">/analyze-patterns</span>   <span class="cmt"># 日誌模式分析</span></div>
+    </div>
+  </div>
+
+  <!-- Section 2: CLAUDE.md 模組化 -->
+  <div class="section">
+    <div class="sec-title">CLAUDE.md 模組化設計</div>
+    <div class="sec-desc">點擊卡片展開每個模組的說明與範例。</div>
+
+    <div class="card">
+      <div class="card-header" onclick="toggleCard('m1')">
+        <div class="card-title">@instructions/no-hardcoded-paths.md</div>
+        <span class="toggle" id="ico-m1">▼</span>
+      </div>
+      <div class="card-body" id="bd-m1">
+        絕對不可出現 <code>C:\Users\&lt;name&gt;\</code> 等硬編碼路徑。必須使用可攜式寫法：Python 用 <code>Path.home()</code>，Shell 用 <code>$HOME</code>，Windows 用 <code>%USERPROFILE%</code>。<br><br>
+        原因：專案在多台 PC 間同步，硬編碼路徑會導致跨機器執行失敗。
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header" onclick="toggleCard('m2')">
+        <div class="card-title">@instructions/code-quality.md</div>
+        <span class="toggle" id="ico-m2">▼</span>
+      </div>
+      <div class="card-body" id="bd-m2">
+        包含 10 個原則：錯誤處理（try/except）、測試同時生成、樣板範本、程式碼風格、鷹架式開發、Windows 特殊注意、防禦性開發、安全性（SQL 注入 / XSS）、重構與效能、資料庫操作。
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header" onclick="toggleCard('m3')">
+        <div class="card-title">@instructions/dev-workflow.md</div>
+        <span class="toggle" id="ico-m3">▼</span>
+      </div>
+      <div class="card-body" id="bd-m3">
+        11 個工作流原則：主動套用進階提示詞技巧、規格先行（> 50 行就寫 spec）、分解為獨立步驟、摘要檢查點、上下文接續、對話分支探索、全端開發 Checklist、文件維護、技術債審查、DB Schema 設計流程、Git 工作流。
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header" onclick="toggleCard('m4')">
+        <div class="card-title">@instructions/writer-qa-iron-rule.md</div>
+        <span class="toggle" id="ico-m4">▼</span>
+      </div>
+      <div class="card-body" id="bd-m4">
+        <strong>最嚴格的模組</strong>：凡是建立或修改 .py/.js/.ts 等 17 個副檔名，主 Claude 禁止直接 Write/Edit，必須依序派 code-writer → code-qa → code-reviewer 三個 sub-agent。防幻覺 + 防自證 + 防技術債。
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 3: Sub-agent FrontMatter 設計器 -->
+  <div class="section">
+    <div class="sec-title">Sub-agent FrontMatter 設計器</div>
+    <div class="sec-desc">填入欄位，自動產生 agent 的 AGENT.md FrontMatter。</div>
+    <div class="fm-builder">
+      <div class="fm-row">
+        <div class="fm-label">Agent 名稱</div>
+        <div class="fm-input"><input id="fm-name" type="text" placeholder="例：code-reviewer" oninput="renderFM()"></div>
+      </div>
+      <div class="fm-row">
+        <div class="fm-label">描述（一行）</div>
+        <div class="fm-input"><input id="fm-desc" type="text" placeholder="例：程式碼審查專家，偵測 bug 和安全漏洞" oninput="renderFM()"></div>
+      </div>
+      <div class="fm-row">
+        <div class="fm-label">模型</div>
+        <div class="fm-input">
+          <select id="fm-model" onchange="renderFM()">
+            <option value="inherit">inherit（繼承主 agent）</option>
+            <option value="haiku">haiku（探索/搜尋用，省 60-80%）</option>
+            <option value="sonnet">sonnet（分析/實作用）</option>
+            <option value="opus">opus（複雜推理用，最貴）</option>
+          </select>
+        </div>
+      </div>
+      <div class="fm-row">
+        <div class="fm-label">允許的工具</div>
+        <div class="fm-input"><input id="fm-tools" type="text" placeholder="例：Read,Grep,Glob（唯讀）或 * (全部)" oninput="renderFM()"></div>
+      </div>
+      <div class="fm-row">
+        <div class="fm-label">觸發條件</div>
+        <div class="fm-input"><textarea id="fm-trigger" placeholder="例：當需要程式碼審查、PR review 時觸發" oninput="renderFM()"></textarea></div>
+      </div>
+      <div class="fm-output">
+        <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px;">產生的 AGENT.md：</div>
+        <div class="code" id="fm-result" style="min-height:80px;white-space:pre-wrap;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 4: 設計原則 Checklist -->
+  <div class="section">
+    <div class="sec-title">CLAUDE.md 設計品質 Checklist</div>
+    <div class="sec-desc">建立新專案或更新 CLAUDE.md 時，勾選以下項目確認品質。</div>
+    <ul class="checklist" id="design-cl">
+      <li><input type="checkbox" id="d1" onchange="updateDesignScore()"><label for="d1"><strong>有清楚的專案概述</strong><span class="sub">一段話說明這是什麼、解決什麼問題</span></label></li>
+      <li><input type="checkbox" id="d2" onchange="updateDesignScore()"><label for="d2"><strong>架構圖存在且準確</strong><span class="sub">目錄結構 / 系統架構，且與實際檔案一致</span></label></li>
+      <li><input type="checkbox" id="d3" onchange="updateDesignScore()"><label for="d3"><strong>鐵律清楚標示</strong><span class="sub">最高優先規則用顯眼標題（🔴 / !!! / CRITICAL）</span></label></li>
+      <li><input type="checkbox" id="d4" onchange="updateDesignScore()"><label for="d4"><strong>規則模組化</strong><span class="sub">用 @instructions/xxx.md 引用，不把所有內容塞進主檔案</span></label></li>
+      <li><input type="checkbox" id="d5" onchange="updateDesignScore()"><label for="d5"><strong>無硬編碼路徑</strong><span class="sub">全部使用 Path.home() / $HOME / %USERPROFILE%</span></label></li>
+      <li><input type="checkbox" id="d6" onchange="updateDesignScore()"><label for="d6"><strong>技術堆疊明確</strong><span class="sub">框架 + 版本 + 為什麼選這個（trade-off 說明）</span></label></li>
+    </ul>
+    <div class="check-result" id="design-result" style="background:var(--bg3);color:var(--text2);">0 / 6 項完成</div>
+  </div>
+
+</div>
+
+<script>
+function switchTab(group,id,btn){
+  document.querySelectorAll('[id^="'+group+'-"]').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tabs .tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById(group+'-'+id).classList.add('active');
+  btn.classList.add('active');
+}
+function toggleCard(id){
+  document.getElementById('bd-'+id).classList.toggle('open');
+  document.getElementById('ico-'+id).classList.toggle('open');
+}
+function renderFM(){
+  const name=document.getElementById('fm-name').value||'agent-name';
+  const desc=document.getElementById('fm-desc').value||'描述這個 agent 做什麼';
+  const model=document.getElementById('fm-model').value;
+  const tools=document.getElementById('fm-tools').value||'*';
+  const trigger=document.getElementById('fm-trigger').value||'當使用者需要 X 時觸發';
+  document.getElementById('fm-result').innerHTML=
+    `<span style="color:#60a5fa">---</span>\n`+
+    `<span style="color:#60a5fa">name:</span> <span style="color:#86efac">${name}</span>\n`+
+    `<span style="color:#60a5fa">description:</span> <span style="color:#86efac">${desc}</span>\n`+
+    `<span style="color:#60a5fa">model:</span> <span style="color:#86efac">${model}</span>\n`+
+    `<span style="color:#60a5fa">tools:</span> [<span style="color:#86efac">${tools}</span>]\n`+
+    `<span style="color:#60a5fa">---</span>\n\n`+
+    `<span style="color:#475569"># 觸發條件</span>\n${trigger}`;
+}
+function updateDesignScore(){
+  const checks=document.querySelectorAll('#design-cl input[type=checkbox]');
+  let n=0; checks.forEach(c=>{if(c.checked)n++;});
+  const el=document.getElementById('design-result');
+  el.textContent=n+' / 6 項完成';
+  if(n>=5){el.style.background='var(--gl)';el.style.color='var(--green)';}
+  else if(n>=3){el.style.background='var(--yl)';el.style.color='var(--yellow)';}
+  else{el.style.background='var(--bg3)';el.style.color='var(--text2)';}
+}
+renderFM();
+</script>
+</body>
+</html>
