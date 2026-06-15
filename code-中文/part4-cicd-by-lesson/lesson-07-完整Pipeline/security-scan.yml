@@ -1,0 +1,34 @@
+# P37: 使用 --permission-mode plan 進行安全的 CI 分析
+# 參考：Claude Code in Production, Part 4
+
+name: 安全性分析
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 安裝 Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+      - name: 安全性分析
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          REPORT=$(claude --permission-mode plan -p \
+            "分析 src/ 目錄並回報下列問題：
+             SQL 注入（SQL injection）、缺少身分驗證檢查、
+             硬編碼的機密資訊（hardcoded secrets）。
+             每個問題請附上檔案名稱、行號與嚴重程度。
+             只輸出報告 — 不要提問。" \
+            --output-format json | jq -r '.result')
+          echo "$REPORT" > security-report.txt
+          cat security-report.txt
+      - name: 上傳安全報告
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-report
+          path: security-report.txt

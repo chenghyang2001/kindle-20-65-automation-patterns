@@ -1,0 +1,24 @@
+{
+  "model": "sonnet",
+  "effortLevel": "medium",
+  "env": {
+    "CLAUDE_CODE_SUBAGENT_MODEL": "haiku",
+    "CLAUDE_CODE_DISABLE_1M_CONTEXT": "1"
+  },
+  "permissions": {
+    "deny": ["mcp__playwright__*", "mcp__magic__*"]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/suggest-compact.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

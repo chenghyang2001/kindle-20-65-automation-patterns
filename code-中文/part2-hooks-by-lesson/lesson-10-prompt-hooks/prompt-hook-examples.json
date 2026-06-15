@@ -1,0 +1,36 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "請檢視以下 session 資料：\n$ARGUMENTS\n\n檢查以下所有項目：\n1. 若 stop_hook_active 為 true，必須回傳 ok: true\n2. 若 last_assistant_message 含有錯誤或顯示工作未完成，回傳 ok: false\n3. 其餘情況回傳 ok: true\n\n一律以 JSON 格式回應：{\"ok\": true/false, \"reason\": \"原因\"}"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "請檢視以下使用者 prompt：\n$ARGUMENTS\n\n檢查 .prompt 欄位是否包含任何敏感資訊（API 金鑰、密碼、個人資料）。若有，回傳 ok: false；否則回傳 ok: true。\n\n{\"ok\": true/false, \"reason\": \"原因\"}"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "prompt",
+            "model": "claude-haiku-4-5-20251001",
+            "prompt": "請檢視檔案編輯的結果：\n$ARGUMENTS\n\n僅當 tool_input.file_path 是 .ts 或 .js 檔案時，檢查是否有明顯的安全問題（SQL 注入、XSS、寫死的憑證）。\n若發現問題，回傳 ok: false 並附具體原因。若無問題或檔案類型不適用，回傳 ok: true。\n{\"ok\": true/false, \"reason\": \"原因\"}"
+          }
+        ]
+      }
+    ]
+  }
+}

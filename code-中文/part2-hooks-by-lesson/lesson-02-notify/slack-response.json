@@ -1,0 +1,17 @@
+{
+  "args": {}, 
+  "data": "data:application/octet-stream;base64,eyJ0ZXh0IjogIkNsYXVkZSBDb2RlOiB1bmtub3duIC0gpb+mYrWlq92/6aRKIn0=", 
+  "files": {}, 
+  "form": {}, 
+  "headers": {
+    "Accept": "*/*", 
+    "Content-Length": "47", 
+    "Content-Type": "application/json", 
+    "Host": "httpbin.org", 
+    "User-Agent": "curl/8.14.1", 
+    "X-Amzn-Trace-Id": "Root=1-6a2c8bf2-682ffd4f1027d80c4b6fc0a9"
+  }, 
+  "json": null, 
+  "origin": "1.164.167.202", 
+  "url": "https://httpbin.org/post"
+}

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "deny": [
+      "Bash(git push --force *)",
+      "Bash(git push origin main)",
+      "Bash(git push origin master)",
+      "Bash(npm publish *)",
+      "Read(//etc/**)",
+      "Read(~/.*)"
+    ],
+    "allow": []
+  },
+  "disableBypassPermissionsMode": "disable",
+  "allowManagedPermissionRulesOnly": true
+}

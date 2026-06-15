@@ -1,0 +1,8 @@
+{
+  "sandbox": {
+    "network": {
+      "httpProxyPort": 8080,
+      "socksProxyPort": 8081
+    }
+  }
+}

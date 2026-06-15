@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>disableBypassPermissionsMode</key>
+  <string>disable</string>
+  <key>allowManagedPermissionRulesOnly</key>
+  <true/>
+  <key>permissions</key>
+  <dict>
+    <key>deny</key>
+    <array>
+      <string>Bash(git push --force *)</string>
+      <string>Bash(npm publish *)</string>
+    </array>
+  </dict>
+</dict>
+</plist>
