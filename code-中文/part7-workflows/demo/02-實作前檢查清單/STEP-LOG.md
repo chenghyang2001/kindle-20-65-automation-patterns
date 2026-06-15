@@ -18,7 +18,6 @@
 ### 指令
 
 ```bash
-# 將 Skill 複製到個人 Skills 目錄
 cp -r code-中文/part7-workflows/skills/confidence-check \
       ~/.claude/skills/confidence-check
 ```
@@ -37,7 +36,11 @@ cp -r code-中文/part7-workflows/skills/confidence-check \
 
 ### 實際結果
 
-（演練時填入）
+Skill 顯示 C1–C5 清單並以 `$ARGUMENTS` 插入任務名稱。
+
+**關鍵設計**：`disable-model-invocation: true` 讓此 Skill 成為純結構性提示詞——
+不呼叫 AI 幫你填答案，強迫「你」去思考每個項目。
+AI 永遠傾向回答「全部 PASS」，只有人類能真正 `grep` codebase 並讀 CLAUDE.md 架構約束。
 
 ---
 
@@ -61,14 +64,14 @@ cp -r code-中文/part7-workflows/skills/confidence-check \
 
 | 項目 | 結果 | 理由 |
 |------|------|------|
-| C1：重複實作檢查 | | |
-| C2：架構合規檢查 | | |
-| C3：官方文件檢查 | | |
-| C4：OSS 參考檢查 | | |
-| C5：根本原因確認 | | |
-| **總分** | / 5 | |
+| C1：重複實作檢查 | **PASS** | `grep -r "credit_card\|validate_card\|luhn" src/` → 無命中，可以新增 |
+| C2：架構合規檢查 | **PASS** | 純函式放 `utils/` 符合分層設計；不涉及 DB 或外部 API，沒有架構違規 |
+| C3：官方文件檢查 | **PASS** | Luhn 演算法是公開規格（ISO/IEC 7812-1），不需要外部 API；若用套件才需查文件 |
+| C4：OSS 參考檢查 | **PASS** | 有 `luhn`、`creditcard` 等套件，但格式驗證只需 ~20 行，自實作更合適（無依賴負擔）|
+| C5：根本原因確認 | **FAIL** | 未確認：是「前端輸入 UX 驗證」還是「後端支付前的安全驗證」？設計完全不同 |
+| **總分** | **4 / 5** | ≥ 4 → **可以開工，但要先解決 C5** |
 
-**結論**（可以開工 / 停下來調查）：
+**結論**：可以開工，但先回去問清楚 C5 的使用情境。
 
 ### 參考答案提示
 
@@ -83,7 +86,7 @@ cp -r code-中文/part7-workflows/skills/confidence-check \
 
 ### 實際結果
 
-（演練時填入）
+4/5 通過，C5 是唯一 FAIL。需求確認優先於技術實作。
 
 ---
 
@@ -93,12 +96,41 @@ cp -r code-中文/part7-workflows/skills/confidence-check \
 
 假設 C1 判 FAIL（已有類似程式碼），討論：
 
-1. 你會怎麼修改原有的函式而非重新實作？
-2. 如果 C3 也 FAIL（文件未查），你會先做哪件事？
+1. **修改原有的函式而非重新實作**
+
+   不重新建檔，改為擴充原函式：
+
+   ```python
+   # 原函式只做長度檢查 → 加入 Luhn 驗證作為可選參數
+   def validate_card_number(number: str, check_luhn: bool = True) -> bool:
+       ...
+   ```
+
+   既有程式碼已被其他地方呼叫，重建等於製造兩套不同步的邏輯炸彈。
+
+2. **C3 也 FAIL 時，修復順序**
+
+   FAIL 的修復有依賴關係，**C3 優先於 C1**：
+
+   ```
+   C3 先查文件（確認 Luhn 正確實作）
+     ↓
+   C1 再 grep（確認要修原函式還是新建）
+     ↓
+   才開始寫程式碼
+   ```
+
+   原因：不先看 Luhn 規格，就算找到舊函式，也不知道舊函式是否實作正確。
+
+| FAIL 的修復順序 | 原則 |
+|----------------|------|
+| C3（文件）→ C1（重複）→ C4（OSS） | 先知道「什麼是對的」，再查「有沒有」，再評「要不要用現成的」 |
+| C5（需求）→ 全部其他 | 需求不清楚，所有技術檢查都是在空轉 |
 
 ### 實際結果
 
-（演練時填入）
+FAIL 的修復順序有因果鏈：C3 是基準，C5 是前提。
+清單不是可以任意排序的，背後有依賴關係。
 
 ---
 
@@ -114,3 +146,5 @@ cp -r code-中文/part7-workflows/skills/confidence-check \
 
 > 門檻設計哲學：4/5（80%）而非 5/5（100%）— 因為 SKIP 是合理的，
 > 但 2/5 以下代表你根本還沒準備好動手。
+>
+> **隱性教訓**：FAIL 的修復有因果鏈——C3（文件）要早於 C1（重複），C5（需求）要早於全部。
