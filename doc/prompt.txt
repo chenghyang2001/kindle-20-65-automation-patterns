@@ -34,3 +34,9 @@ c:\Users\user\workspace\kindle-20-65-automation-patterns\code-中文\part3-agent
 跑第 5 課
 跑第 6 課
 跑第 7 課
+
+=== Session Part 7 L6-L7（2026-06-15）===
+answer
+存檔進第6課
+answer
+存檔進第7課
